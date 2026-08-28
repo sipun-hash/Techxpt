@@ -16,6 +16,7 @@ import {
   ChevronDown 
 } from 'lucide-react';
 import CTA from '../sections/CTA';
+import { API_ENDPOINTS } from '../config/api';
 
 export default function InternshipPage({ onStartProject, onBack }) {
   const [selectedTrack, setSelectedTrack] = useState('react');
@@ -124,7 +125,7 @@ export default function InternshipPage({ onStartProject, onBack }) {
         duration: formData.duration
       };
 
-      const res = await fetch('http://localhost/techxpt-api/internship.php', {
+      const res = await fetch(API_ENDPOINTS.internship, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

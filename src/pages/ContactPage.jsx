@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowRight, CheckCircle2, Send, Mail, MapPin, Phone, ShieldCheck } from 'lucide-react';
 import { BRAND } from '../data/content';
+import { API_ENDPOINTS } from '../config/api';
 
 export default function ContactPage({ onBack }) {
   const [selectedServices, setSelectedServices] = useState(['Web Development']);
@@ -48,7 +49,7 @@ export default function ContactPage({ onBack }) {
         message: formData.message
       };
 
-      const res = await fetch('http://localhost/techxpt-api/contact.php', {
+      const res = await fetch(API_ENDPOINTS.contact, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

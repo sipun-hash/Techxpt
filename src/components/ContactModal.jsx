@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowRight, CheckCircle2, Send, Mail, MapPin } from 'lucide-react';
 import { BRAND } from '../data/content';
 
+import { API_ENDPOINTS } from '../config/api';
+
 export default function ContactModal({ isOpen, onClose }) {
   const [selectedServices, setSelectedServices] = useState(['Web Development']);
   const [selectedBudget, setSelectedBudget] = useState('₹3L - ₹10L');
@@ -94,7 +96,7 @@ export default function ContactModal({ isOpen, onClose }) {
         message: formData.message
       };
 
-      const res = await fetch('http://localhost/techxpt-api/contact.php', {
+      const res = await fetch(API_ENDPOINTS.contact, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

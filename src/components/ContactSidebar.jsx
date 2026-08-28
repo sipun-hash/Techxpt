@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, CheckCircle2, ShieldCheck, Mail, Phone } from 'lucide-react';
 import { BRAND } from '../data/content';
+import { API_ENDPOINTS } from '../config/api';
 
 export default function ContactSidebar({ isOpen, onClose }) {
   const [selectedServices, setSelectedServices] = useState(['Web Development']);
@@ -72,7 +73,7 @@ export default function ContactSidebar({ isOpen, onClose }) {
         message: formData.message
       };
 
-      const res = await fetch('http://localhost/techxpt-api/contact.php', {
+      const res = await fetch(API_ENDPOINTS.contact, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
