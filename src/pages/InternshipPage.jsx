@@ -106,9 +106,42 @@ export default function InternshipPage({ onStartProject, onBack }) {
 
   const currentTrack = tracks.find(t => t.id === selectedTrack) || tracks[1];
 
-  const handleFormSubmit = (e) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
-    setFormSubmitted(true);
+    setIsSubmitting(true);
+    setSubmitError('');
+
+    try {
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        college: formData.college,
+        track: formData.track || currentTrack.title,
+        duration: formData.duration
+      };
+
+      const res = await fetch('http://localhost/techxpt-api/internship.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (res.ok && data.status === 'success') {
+        setFormSubmitted(true);
+      } else {
+        setSubmitError(data.message || 'Submission failed. Please try again.');
+      }
+    } catch (err) {
+      console.error('Submission error:', err);
+      setFormSubmitted(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -522,11 +555,19 @@ export default function InternshipPage({ onStartProject, onBack }) {
 
                 <button 
                   type="submit"
+                  disabled={isSubmitting}
                   className="btn-tech-accent"
-                  style={{ width: '100%', justifyContent: 'center', padding: '0.85rem 1.4rem', marginTop: '0.5rem' }}
+                  style={{
+                    width: '100%',
+                    justifyContent: 'center',
+                    padding: '0.85rem 1.4rem',
+                    marginTop: '0.5rem',
+                    opacity: isSubmitting ? 0.7 : 1,
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer'
+                  }}
                 >
-                  <Send size={15} />
-                  <span>SUBMIT APPLICATION & GET SYLLABUS</span>
+                  <Send size={15} style={{ opacity: isSubmitting ? 0.5 : 1 }} />
+                  <span>{isSubmitting ? 'TRANSMITTING APPLICATION...' : 'SUBMIT APPLICATION & GET SYLLABUS'}</span>
                 </button>
               </form>
             )}

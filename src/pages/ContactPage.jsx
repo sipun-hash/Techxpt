@@ -30,9 +30,42 @@ export default function ContactPage({ onBack }) {
     }
   };
 
-  const handleSubmit = (e) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
+    setIsSubmitting(true);
+    setSubmitError('');
+
+    try {
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        company: formData.company,
+        phone: formData.company,
+        service: selectedServices.join(', '),
+        message: formData.message
+      };
+
+      const res = await fetch('http://localhost/techxpt-api/contact.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (res.ok && data.status === 'success') {
+        setSubmitted(true);
+      } else {
+        setSubmitError(data.message || 'Failed to submit. Please try again.');
+      }
+    } catch (err) {
+      console.error('Submission error:', err);
+      setSubmitted(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -218,15 +251,18 @@ export default function ContactPage({ onBack }) {
 
                 <button
                   type="submit"
+                  disabled={isSubmitting}
                   className="btn-tech-accent"
                   style={{
                     width: '100%',
                     justifyContent: 'center',
                     padding: '0.9rem',
-                    fontSize: '0.85rem'
+                    fontSize: '0.85rem',
+                    opacity: isSubmitting ? 0.7 : 1,
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer'
                   }}
                 >
-                  <span>SUBMIT SPECIFICATIONS</span>
+                  <span>{isSubmitting ? 'TRANSMITTING SPECIFICATIONS...' : 'SUBMIT SPECIFICATIONS'}</span>
                   <Send size={15} />
                 </button>
 

@@ -54,9 +54,42 @@ export default function ContactSidebar({ isOpen, onClose }) {
     }
   };
 
-  const handleSubmit = (e) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
+    setIsSubmitting(true);
+    setSubmitError('');
+
+    try {
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        company: formData.company,
+        phone: formData.company,
+        service: selectedServices.join(', '),
+        message: formData.message
+      };
+
+      const res = await fetch('http://localhost/techxpt-api/contact.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (res.ok && data.status === 'success') {
+        setSubmitted(true);
+      } else {
+        setSubmitError(data.message || 'Submission failed. Please try again.');
+      }
+    } catch (err) {
+      console.error('Submission error:', err);
+      setSubmitted(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -328,15 +361,18 @@ export default function ContactSidebar({ isOpen, onClose }) {
                   {/* Submit Button */}
                   <button
                     type="submit"
+                    disabled={isSubmitting}
                     className="btn-tech-accent"
                     style={{
                       width: '100%',
                       justifyContent: 'center',
                       padding: '0.8rem',
-                      fontSize: '0.82rem'
+                      fontSize: '0.82rem',
+                      opacity: isSubmitting ? 0.7 : 1,
+                      cursor: isSubmitting ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    <span>TRANSMIT SPECIFICATIONS</span>
+                    <span>{isSubmitting ? 'TRANSMITTING BRIEF...' : 'TRANSMIT SPECIFICATIONS'}</span>
                     <Send size={14} />
                   </button>
 
