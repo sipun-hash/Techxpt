@@ -6,6 +6,7 @@ import IntroAnimation from './components/IntroAnimation';
 import ErrorBoundary from './components/ErrorBoundary';
 import ContactSidebar from './components/ContactSidebar';
 import MaintenanceScreen from './components/MaintenanceScreen';
+import ScrollProgress from './components/ScrollProgress';
 import { API_ENDPOINTS } from './config/api';
 
 // Pages
@@ -277,6 +278,9 @@ export default function App() {
 
           {/* Dynamic Context Custom Cursor (Desktop Only) */}
           <CustomCursor cursorMode={cursorMode} cursorText={cursorText} />
+
+          {/* High-Tech Scroll Progress Indicator & Depth HUD */}
+          <ScrollProgress />
 
           {/* Sticky Minimal Navbar with Integrated Emergency Announcement Bar */}
           <Navbar 
