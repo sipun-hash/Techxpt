@@ -258,7 +258,8 @@ export default function App() {
       style={{
         backgroundColor: 'var(--bg)',
         color: 'var(--text-primary)',
-        transition: 'background-color 0.3s ease, color 0.3s ease'
+        transition: 'background-color 0.3s ease, color 0.3s ease',
+        '--banner-offset': systemStatus.announcement_active && systemStatus.announcement_text ? '38px' : '0px'
       }}
     >
       {/* 1. Maintenance Mode Overlay Screen */}

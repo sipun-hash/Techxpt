@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, ArrowDown } from 'lucide-react';
-import InteractiveGrid from '../components/InteractiveGrid';
+import HeroShowcaseSlider from '../components/HeroShowcaseSlider';
 import MagneticButton from '../components/MagneticButton';
 import HeroGridBackground from '../components/HeroGridBackground';
 
@@ -38,8 +38,8 @@ export default function Hero({ onStartProject, onExploreWork }) {
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        paddingTop: 'calc(var(--nav-height) + 1rem)',
-        paddingBottom: '2rem',
+        paddingTop: 'calc(var(--nav-height) + var(--banner-offset, 0px) + 2.75rem)',
+        paddingBottom: '3rem',
         borderBottom: '1px solid var(--border)',
         overflow: 'hidden',
         backgroundColor: 'var(--bg)',
@@ -168,15 +168,15 @@ export default function Hero({ onStartProject, onExploreWork }) {
             </motion.div>
           </div>
 
-          {/* Right: Technical Interactive Grid */}
+          {/* Right: Unique Interactive Showcase Slider */}
           <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.25, duration: 0.6 }}
-              style={{ width: '100%', maxWidth: '390px' }}
+              style={{ width: '100%', maxWidth: '480px' }}
             >
-              <InteractiveGrid />
+              <HeroShowcaseSlider onStartProject={onStartProject} />
             </motion.div>
           </div>
 
