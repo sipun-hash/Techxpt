@@ -241,9 +241,9 @@ export default function Navbar({ currentRoute, setCurrentRoute, onOpenContact, t
               </AnimatePresence>
             </motion.button>
           </div>
-
         </div>
-      </header>
+      </div>
+    </header>
 
       {/* Mobile Drawer Menu */}
       <AnimatePresence>
