@@ -1,8 +1,8 @@
 <?php
 // api/admin.php
-// Enterprise Admin Dashboard - TECHXPT
+// Enterprise Admin Dashboard & Emergency Command Center - TECHXPT
 // Strict 3-Color Palette: Premium Red (#FF2424), Premium Black (#0A0A0A), Premium White (#FFFFFF)
-// Zero Border-Radius (Sharp Architectural Styling) & Fully Responsive
+// Zero Border-Radius (0px Sharp Architectural Styling) & Fully Responsive
 
 // -------------------------------------------------------------
 // 1. Security Headers
@@ -38,7 +38,7 @@ if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY']) >
 $_SESSION['LAST_ACTIVITY'] = time();
 
 // -------------------------------------------------------------
-// 3. Database Connection & Config
+// 3. Database Connection & System Settings
 // -------------------------------------------------------------
 require_once 'db.php';
 
@@ -48,6 +48,20 @@ $ADMIN_PASS = getenv('ADMIN_PASS') ?: 'TechXpt@2026Secure';
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
+
+$settings_file = __DIR__ . '/system_settings.json';
+if (!file_exists($settings_file)) {
+    file_put_contents($settings_file, json_encode([
+        "maintenance_mode" => false,
+        "maintenance_message" => "TECHXPT is currently undergoing scheduled maintenance. We will be back online shortly.",
+        "maintenance_eta" => "1 Hour",
+        "pause_submissions" => false,
+        "announcement_active" => false,
+        "announcement_text" => "",
+        "last_updated" => date('Y-m-d H:i:s')
+    ], JSON_PRETTY_PRINT));
+}
+$sys = json_decode(file_get_contents($settings_file), true);
 
 // Rate Limiting
 if (!isset($_SESSION['login_attempts'])) {
@@ -72,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $login_error = "Too many attempts. Locked for $remaining minute(s).";
     } else {
         if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
-            $login_error = "Security token error. Please try again.";
+            $login_error = "Security token mismatch. Please reload and try again.";
         } else {
             $input_user = trim($_POST['username'] ?? '');
             $input_pass = trim($_POST['password'] ?? '');
@@ -89,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $_SESSION['login_attempts']++;
                 if ($_SESSION['login_attempts'] >= 5) {
                     $_SESSION['lockout_time'] = time() + 900;
-                    $login_error = "Account locked for 15 minutes due to failed attempts.";
+                    $login_error = "Account locked for 15 minutes due to multiple failed attempts.";
                 } else {
                     $left = 5 - $_SESSION['login_attempts'];
                     $login_error = "Invalid credentials. ($left attempts left)";
@@ -102,12 +116,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 $is_logged_in = !empty($_SESSION['authenticated']) && $_SESSION['authenticated'] === true;
 
 // -------------------------------------------------------------
-// 4. Data Actions (Export & Delete)
+// 4. Authenticated Actions (Export, Delete, Emergency Controls)
 // -------------------------------------------------------------
+$notification = '';
 if ($is_logged_in) {
+    
+    // Save Emergency Settings
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_emergency') {
+        if (isset($_POST['csrf_token']) && hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            $sys['maintenance_mode'] = isset($_POST['maintenance_mode']);
+            $sys['maintenance_message'] = trim($_POST['maintenance_message'] ?? 'TECHXPT is undergoing system maintenance.');
+            $sys['maintenance_eta'] = trim($_POST['maintenance_eta'] ?? '1 Hour');
+            $sys['pause_submissions'] = isset($_POST['pause_submissions']);
+            $sys['announcement_active'] = isset($_POST['announcement_active']);
+            $sys['announcement_text'] = trim($_POST['announcement_text'] ?? '');
+            $sys['last_updated'] = date('Y-m-d H:i:s');
+
+            file_put_contents($settings_file, json_encode($sys, JSON_PRETTY_PRINT));
+            $notification = "Emergency settings successfully updated!";
+        }
+    }
+
+    // Emergency Reset Lockouts
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'reset_security') {
+        if (isset($_POST['csrf_token']) && hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            $_SESSION['login_attempts'] = 0;
+            $_SESSION['lockout_time'] = 0;
+            $notification = "Security rate-limiter and lockout counters have been reset!";
+        }
+    }
+
+    // Full JSON System Backup
+    if (isset($_GET['export']) && $_GET['export'] === 'full_backup') {
+        $contacts_data = $conn->query("SELECT * FROM contact_submissions")->fetchAll(PDO::FETCH_ASSOC);
+        $internships_data = $conn->query("SELECT * FROM internship_applications")->fetchAll(PDO::FETCH_ASSOC);
+        
+        $backup = [
+            "system" => "TECHXPT",
+            "backup_date" => date('Y-m-d H:i:s'),
+            "settings" => $sys,
+            "contact_submissions" => $contacts_data,
+            "internship_applications" => $internships_data
+        ];
+
+        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Disposition: attachment; filename=techxpt_full_backup_' . date('Y-m-d_His') . '.json');
+        echo json_encode($backup, JSON_PRETTY_PRINT);
+        exit;
+    }
+
     // CSV Export
-    if (isset($_GET['export'])) {
-        $export_type = $_GET['export'] === 'internships' ? 'internships' : 'contacts';
+    if (isset($_GET['export']) && in_array($_GET['export'], ['contacts', 'internships'])) {
+        $export_type = $_GET['export'];
         $filename = "techxpt_" . $export_type . "_" . date('Y-m-d') . ".csv";
 
         header('Content-Type: text/csv; charset=utf-8');
@@ -115,7 +175,7 @@ if ($is_logged_in) {
         $output = fopen('php://output', 'w');
 
         if ($export_type === 'contacts') {
-            fputcsv($output, ['ID', 'Name', 'Email', 'Phone / Company', 'Services Requested', 'Message', 'Date Submitted']);
+            fputcsv($output, ['ID', 'Name', 'Email', 'Phone / Company', 'Services', 'Message', 'Date Submitted']);
             $stmt = $conn->query("SELECT id, name, email, phone, service, message, created_at FROM contact_submissions ORDER BY created_at DESC");
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                 fputcsv($output, $row);
@@ -143,6 +203,15 @@ if ($is_logged_in) {
         }
         header("Location: admin.php?tab=" . urlencode($_POST['tab'] ?? 'contacts'));
         exit;
+    }
+
+    // Test DB Ping Latency
+    $ping_start = microtime(true);
+    try {
+        $conn->query("SELECT 1");
+        $ping_ms = round((microtime(true) - $ping_start) * 1000, 2);
+    } catch (Exception $e) {
+        $ping_ms = "Error";
     }
 
     // Fetch Lists
@@ -180,10 +249,10 @@ $active_tab = $_GET['tab'] ?? 'contacts';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TECHXPT Admin</title>
+    <title>TECHXPT Admin & Emergency Control</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         /* -------------------------------------------------------------
            STRICT 3-COLOR THEME TOKENS: RED, BLACK, WHITE (ZERO BORDER-RADIUS)
@@ -292,7 +361,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             color: var(--text-secondary);
             margin-bottom: 0.4rem;
         }
-        input[type="text"], input[type="password"] {
+        input[type="text"], input[type="password"], textarea, select {
             width: 100%;
             padding: 0.8rem 0.9rem;
             background: var(--bg);
@@ -303,7 +372,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             outline: none;
             transition: border-color 0.2s;
         }
-        input:focus { border-color: var(--red); }
+        input:focus, textarea:focus, select:focus { border-color: var(--red); }
 
         .btn-primary {
             width: 100%;
@@ -317,6 +386,11 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             letter-spacing: 0.08em;
             cursor: pointer;
             transition: background 0.2s, border-color 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
         .btn-primary:hover {
             background: var(--red-hover);
@@ -355,7 +429,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             border-color: var(--red);
         }
 
-        .alert-error {
+        .alert-box {
             background: var(--red-subtle);
             border-left: 3px solid var(--red);
             color: var(--red);
@@ -528,7 +602,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             flex-wrap: wrap;
             margin-bottom: 1.25rem;
         }
-        .desktop-tabs { display: flex; gap: 0.5rem; }
+        .desktop-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .tab-btn {
             padding: 0.65rem 1.25rem;
             font-size: 0.82rem;
@@ -560,7 +634,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
         }
 
         /* -------------------------------------------------------------
-           TABLE & RESPONSIVE LIST VIEW
+           TABLE & LIST VIEW
            ------------------------------------------------------------- */
         .table-wrap {
             background: var(--surface);
@@ -629,6 +703,102 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             display: flex;
             gap: 6px;
             flex-wrap: wrap;
+        }
+
+        /* -------------------------------------------------------------
+           EMERGENCY COMMAND CENTER CARDS
+           ------------------------------------------------------------- */
+        .emergency-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+        }
+        .emergency-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 1.75rem;
+            box-shadow: var(--card-shadow);
+            position: relative;
+        }
+        .emergency-card.danger {
+            border-color: var(--red-border);
+        }
+        .emergency-card.danger::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+            background: var(--red);
+        }
+        .card-header-title {
+            font-size: 1.1rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-primary);
+            margin-bottom: 0.35rem;
+        }
+        .card-subtext {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.25rem;
+            line-height: 1.5;
+        }
+        .switch-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.85rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            margin-bottom: 1rem;
+        }
+        .switch-title {
+            font-size: 0.85rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: var(--text-primary);
+        }
+        .switch-desc {
+            font-size: 0.76rem;
+            color: var(--text-secondary);
+        }
+
+        /* Custom Toggle Checkbox */
+        .custom-toggle {
+            position: relative;
+            display: inline-block;
+            width: 46px;
+            height: 24px;
+        }
+        .custom-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--border-light);
+            transition: .2s;
+            border: 1px solid var(--border);
+        }
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #FFFFFF;
+            transition: .2s;
+        }
+        input:checked + .toggle-slider {
+            background-color: var(--red);
+            border-color: var(--red);
+        }
+        input:checked + .toggle-slider:before {
+            transform: translateX(22px);
         }
 
         /* -------------------------------------------------------------
@@ -728,7 +898,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             <div class="brand-sub">Admin Portal Login</div>
 
             <?php if (!empty($login_error)): ?>
-                <div class="alert-error"><?= safe($login_error) ?></div>
+                <div class="alert-box"><?= safe($login_error) ?></div>
             <?php endif; ?>
 
             <form method="POST" action="admin.php">
@@ -755,7 +925,11 @@ $active_tab = $_GET['tab'] ?? 'contacts';
     <header class="topbar">
         <div class="topbar-left">
             <a href="admin.php" class="logo">TECH<span>XPT</span></a>
-            <span class="status-pill">Aiven Cloud Connected</span>
+            <?php if (!empty($sys['maintenance_mode'])): ?>
+                <span class="status-pill" style="background: var(--red); color: #FFF;">⚠️ Maintenance Mode Active</span>
+            <?php else: ?>
+                <span class="status-pill">Aiven Cloud Connected</span>
+            <?php endif; ?>
         </div>
 
         <div class="topbar-actions">
@@ -786,13 +960,23 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             <span>Internship Applications</span>
             <span>(<?= count($internships) ?>)</span>
         </a>
-        <a href="admin.php?export=<?= $active_tab === 'contacts' ? 'contacts' : 'internships' ?>" class="mobile-nav-link" style="background: var(--red); color: #fff; border-color: var(--red);">
+        <a href="admin.php?tab=emergency" class="mobile-nav-link <?= $active_tab === 'emergency' ? 'active' : '' ?>" style="color: var(--red);">
+            <span>🚨 Emergency Controls</span>
+            <span>⚙</span>
+        </a>
+        <a href="admin.php?export=<?= $active_tab === 'internships' ? 'internships' : 'contacts' ?>" class="mobile-nav-link" style="background: var(--red); color: #fff; border-color: var(--red);">
             <span>Download CSV / Excel</span>
             <span>⬇</span>
         </a>
     </nav>
 
     <main class="main-container">
+
+        <?php if (!empty($notification)): ?>
+            <div class="alert-box" style="background: rgba(255, 36, 36, 0.15); color: #FFF; border-color: var(--red);">
+                <?= safe($notification) ?>
+            </div>
+        <?php endif; ?>
 
         <!-- Top Statistics Grid -->
         <div class="stats-grid">
@@ -807,12 +991,12 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                 <div class="stat-sub">+<?= $today_interns ?> New Today</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Active Database Server</div>
+                <div class="stat-label">Database Ping / Health</div>
                 <div class="stat-val" style="font-size: 1.35rem; color: var(--red); padding-top: 0.25rem;">
-                    Aiven MySQL
+                    <?= $ping_ms ?> ms
                 </div>
                 <div style="font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.35rem; font-weight: 700;">
-                    SSL Encrypted
+                    Aiven MySQL Cloud (SSL)
                 </div>
             </div>
         </div>
@@ -827,22 +1011,27 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                 <a href="admin.php?tab=internships" class="tab-btn <?= $active_tab === 'internships' ? 'active' : '' ?>">
                     Internship Applications (<?= count($internships) ?>)
                 </a>
+                <a href="admin.php?tab=emergency" class="tab-btn <?= $active_tab === 'emergency' ? 'active' : '' ?>" style="border-color: var(--red-border); color: var(--red);">
+                    🚨 Emergency Controls
+                </a>
             </div>
 
             <!-- Search & Export -->
-            <div style="display: flex; gap: 0.65rem; flex-wrap: wrap; flex: 1; justify-content: flex-end;">
-                <div class="search-wrap">
-                    <input 
-                        type="text" 
-                        id="searchInput" 
-                        placeholder="Search name, email, phone..." 
-                        onkeyup="searchRows()"
-                    >
+            <?php if ($active_tab !== 'emergency'): ?>
+                <div style="display: flex; gap: 0.65rem; flex-wrap: wrap; flex: 1; justify-content: flex-end;">
+                    <div class="search-wrap">
+                        <input 
+                            type="text" 
+                            id="searchInput" 
+                            placeholder="Search name, email, phone..." 
+                            onkeyup="searchRows()"
+                        >
+                    </div>
+                    <a href="admin.php?export=<?= $active_tab === 'contacts' ? 'contacts' : 'internships' ?>" class="btn-primary" style="width: auto; padding: 0.65rem 1.25rem; font-size: 0.8rem;">
+                        Download Excel
+                    </a>
                 </div>
-                <a href="admin.php?export=<?= $active_tab === 'contacts' ? 'contacts' : 'internships' ?>" class="btn-primary" style="width: auto; padding: 0.65rem 1.25rem; font-size: 0.8rem;">
-                    Download Excel
-                </a>
-            </div>
+            <?php endif; ?>
         </div>
 
         <!-- TAB 1: CONTACT LEADS -->
@@ -927,7 +1116,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             </div>
 
         <!-- TAB 2: INTERNSHIP APPLICATIONS -->
-        <?php else: ?>
+        <?php elseif ($active_tab === 'internships'): ?>
             <div class="table-wrap">
                 <table id="recordsTable">
                     <thead>
@@ -1011,6 +1200,139 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                         <?php endif; ?>
                     </tbody>
                 </table>
+            </div>
+
+        <!-- TAB 3: 🚨 EMERGENCY & SYSTEM COMMAND CENTER -->
+        <?php else: ?>
+            <div class="emergency-grid">
+
+                <!-- 1. Maintenance Mode & Form Freeze -->
+                <div class="emergency-card danger">
+                    <div class="card-header-title">🚨 Site Operations & Maintenance</div>
+                    <div class="card-subtext">
+                        Control public access, freeze inbound form submissions, or broadcast emergency announcements.
+                    </div>
+
+                    <form method="POST" action="admin.php">
+                        <input type="hidden" name="action" value="save_emergency">
+                        <input type="hidden" name="csrf_token" value="<?= safe($_SESSION['csrf_token']) ?>">
+
+                        <!-- Switch 1: Maintenance Mode -->
+                        <div class="switch-row">
+                            <div>
+                                <div class="switch-title">Maintenance Mode</div>
+                                <div class="switch-desc">Displays maintenance notice across website.</div>
+                            </div>
+                            <label class="custom-toggle">
+                                <input type="checkbox" name="maintenance_mode" <?= !empty($sys['maintenance_mode']) ? 'checked' : '' ?>>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <!-- Switch 2: Pause Submissions -->
+                        <div class="switch-row">
+                            <div>
+                                <div class="switch-title">Pause Form Inquiries</div>
+                                <div class="switch-desc">Temporarily rejects new contact & internship submissions.</div>
+                            </div>
+                            <label class="custom-toggle">
+                                <input type="checkbox" name="pause_submissions" <?= !empty($sys['pause_submissions']) ? 'checked' : '' ?>>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <!-- Maintenance Message Field -->
+                        <div class="form-group">
+                            <label>Maintenance Notice Text</label>
+                            <textarea name="maintenance_message" rows="2"><?= safe($sys['maintenance_message'] ?? '') ?></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Estimated Return Time (ETA)</label>
+                            <input type="text" name="maintenance_eta" value="<?= safe($sys['maintenance_eta'] ?? '1 Hour') ?>" placeholder="e.g. 2 Hours / 10:00 PM">
+                        </div>
+
+                        <!-- Switch 3: Site Announcement -->
+                        <div class="switch-row" style="margin-top: 1.25rem;">
+                            <div>
+                                <div class="switch-title">Broadcast Site Notice</div>
+                                <div class="switch-desc">Displays custom top alert bar on website.</div>
+                            </div>
+                            <label class="custom-toggle">
+                                <input type="checkbox" name="announcement_active" <?= !empty($sys['announcement_active']) ? 'checked' : '' ?>>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Announcement Text</label>
+                            <textarea name="announcement_text" rows="2" placeholder="e.g. High volume notice..."><?= safe($sys['announcement_text'] ?? '') ?></textarea>
+                        </div>
+
+                        <button type="submit" class="btn-primary" style="margin-top: 0.5rem;">
+                            Save & Deploy Changes
+                        </button>
+                    </form>
+                </div>
+
+                <!-- 2. Diagnostics & Quick Recovery Actions -->
+                <div class="emergency-card">
+                    <div class="card-header-title">⚡ Cloud Diagnostics & Backups</div>
+                    <div class="card-subtext">
+                        Run health checks, export complete data backups, or unlock rate-limited administrators.
+                    </div>
+
+                    <!-- Cloud Ping Diagnostics -->
+                    <div style="background: var(--bg); border: 1px solid var(--border); padding: 1rem; margin-bottom: 1.25rem;">
+                        <div style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                            Database Diagnostics
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; padding: 4px 0; border-bottom: 1px solid var(--border);">
+                            <span>Roundtrip Latency (Ping)</span>
+                            <span style="font-weight: 800; color: var(--red);"><?= $ping_ms ?> ms</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; padding: 4px 0; border-bottom: 1px solid var(--border);">
+                            <span>Total Contact Records</span>
+                            <span style="font-weight: 800; color: var(--text-primary);"><?= count($contacts) ?></span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; padding: 4px 0;">
+                            <span>Total Intern Applications</span>
+                            <span style="font-weight: 800; color: var(--text-primary);"><?= count($internships) ?></span>
+                        </div>
+                    </div>
+
+                    <!-- Full Backup Download -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="font-size: 0.85rem; font-weight: 800; text-transform: uppercase; color: var(--text-primary); margin-bottom: 0.35rem;">
+                            Full System Backup
+                        </div>
+                        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                            Download complete JSON snapshot of all database records and system settings.
+                        </div>
+                        <a href="admin.php?export=full_backup" class="btn-outline" style="width: 100%; border-color: var(--text-primary); padding: 0.75rem;">
+                            💾 Download Full Backup (JSON)
+                        </a>
+                    </div>
+
+                    <!-- Security Rate-Limiter Reset -->
+                    <div>
+                        <div style="font-size: 0.85rem; font-weight: 800; text-transform: uppercase; color: var(--text-primary); margin-bottom: 0.35rem;">
+                            Security Lockout Reset
+                        </div>
+                        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                            Clear failed login attempt counters and unlock administrators.
+                        </div>
+                        <form method="POST" action="admin.php" onsubmit="return confirm('Reset all login security counters?');">
+                            <input type="hidden" name="action" value="reset_security">
+                            <input type="hidden" name="csrf_token" value="<?= safe($_SESSION['csrf_token']) ?>">
+                            <button type="submit" class="btn-outline btn-red" style="width: 100%; padding: 0.75rem;">
+                                🔓 Reset Rate-Limiter & Lockouts
+                            </button>
+                        </form>
+                    </div>
+
+                </div>
+
             </div>
         <?php endif; ?>
 

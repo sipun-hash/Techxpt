@@ -1,0 +1,9 @@
+{
+    "maintenance_mode": false,
+    "maintenance_message": "TECHXPT is currently undergoing scheduled system upgrades. We will be back shortly.",
+    "maintenance_eta": "1 Hour",
+    "pause_submissions": false,
+    "announcement_active": false,
+    "announcement_text": "We are experiencing high project inquiry volume. Responses may take up to 24 hours.",
+    "last_updated": "2026-08-29 07:55:00"
+}
