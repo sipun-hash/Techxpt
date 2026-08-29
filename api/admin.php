@@ -119,12 +119,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
         exit;
     }
 
-    // Check Whitelist if set
-    if (!empty($ADMIN_GOOGLE_EMAILS)) {
-        $allowedList = array_map('trim', explode(',', strtolower($ADMIN_GOOGLE_EMAILS)));
+    // Check Whitelist from Database settings or Environment Variable
+    $effectiveWhitelist = !empty($sys['admin_google_emails']) ? $sys['admin_google_emails'] : $ADMIN_GOOGLE_EMAILS;
+    if (!empty($effectiveWhitelist)) {
+        $allowedList = array_map('trim', explode(',', strtolower($effectiveWhitelist)));
         if (!in_array($authenticatedEmail, $allowedList)) {
             http_response_code(403);
-            echo json_encode(["status" => "error", "message" => "Access Denied: $authenticatedEmail is not on the authorized admin list."]);
+            echo json_encode([
+                "status" => "error", 
+                "message" => "Access Denied: $authenticatedEmail is not an authorized administrator. Please use an approved admin Google account."
+            ]);
             exit;
         }
     }
@@ -197,7 +201,7 @@ $is_logged_in = !empty($_SESSION['authenticated']) && $_SESSION['authenticated']
 $notification = '';
 if ($is_logged_in) {
     
-    // Save Emergency Settings
+    // Save Emergency Settings & Whitelist
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_emergency') {
         if (isset($_POST['csrf_token']) && hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
             $sys['maintenance_mode'] = isset($_POST['maintenance_mode']);
@@ -206,10 +210,11 @@ if ($is_logged_in) {
             $sys['pause_submissions'] = isset($_POST['pause_submissions']);
             $sys['announcement_active'] = isset($_POST['announcement_active']);
             $sys['announcement_text'] = trim($_POST['announcement_text'] ?? '');
+            $sys['admin_google_emails'] = trim($_POST['admin_google_emails'] ?? '');
             $sys['last_updated'] = date('Y-m-d H:i:s');
 
             saveSystemSettings($conn, $sys);
-            $notification = "Emergency settings successfully updated and saved to cloud database!";
+            $notification = "Emergency settings and Google email whitelist successfully updated!";
         }
     }
 
@@ -1715,12 +1720,15 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                             </label>
                         </div>
 
-                        <div class="form-group">
-                            <label>Announcement Text</label>
-                            <textarea name="announcement_text" rows="2" placeholder="e.g. High volume notice..."><?= safe($sys['announcement_text'] ?? '') ?></textarea>
+                        <div class="form-group" style="margin-top: 1.25rem;">
+                            <label>Authorized Google Admin Accounts (Whitelist)</label>
+                            <div style="font-size: 0.74rem; color: var(--text-secondary); margin-bottom: 0.35rem; line-height: 1.4;">
+                                Comma-separated list of approved Google emails allowed to log in (e.g. <code>yourname@gmail.com, ceo@techxpt.com</code>). If empty, any verified Google account can sign in.
+                            </div>
+                            <input type="text" name="admin_google_emails" value="<?= safe($sys['admin_google_emails'] ?? '') ?>" placeholder="e.g. your-email@gmail.com, ceo@techxpt.com">
                         </div>
 
-                        <button type="submit" class="btn-primary" style="margin-top: 0.5rem;">
+                        <button type="submit" class="btn-primary" style="margin-top: 0.75rem;">
                             Save & Deploy Changes
                         </button>
                     </form>

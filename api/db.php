@@ -57,6 +57,7 @@ function getSystemSettings($conn) {
             "pause_submissions" => !empty($rows['pause_submissions']) && $rows['pause_submissions'] === '1',
             "announcement_active" => !empty($rows['announcement_active']) && $rows['announcement_active'] === '1',
             "announcement_text" => $rows['announcement_text'] ?? "",
+            "admin_google_emails" => $rows['admin_google_emails'] ?? (getenv('ADMIN_GOOGLE_EMAILS') ?: ''),
             "last_updated" => $rows['last_updated'] ?? date('Y-m-d H:i:s')
         ];
     } catch (Exception $e) {
@@ -67,6 +68,7 @@ function getSystemSettings($conn) {
             "pause_submissions" => false,
             "announcement_active" => false,
             "announcement_text" => "",
+            "admin_google_emails" => getenv('ADMIN_GOOGLE_EMAILS') ?: '',
             "last_updated" => date('Y-m-d H:i:s')
         ];
     }
@@ -91,6 +93,7 @@ function saveSystemSettings($conn, $settings) {
             'pause_submissions' => !empty($settings['pause_submissions']) ? '1' : '0',
             'announcement_active' => !empty($settings['announcement_active']) ? '1' : '0',
             'announcement_text' => $settings['announcement_text'] ?? '',
+            'admin_google_emails' => $settings['admin_google_emails'] ?? '',
             'last_updated' => date('Y-m-d H:i:s')
         ];
 
