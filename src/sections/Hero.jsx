@@ -168,8 +168,8 @@ export default function Hero({ onStartProject, onExploreWork }) {
             </motion.div>
           </div>
 
-          {/* Right: 3D Modular Depth Architectural Sculpture */}
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+          {/* Right: 3D Modular Depth Architectural Sculpture (Hidden on Mobile) */}
+          <div className="hero-3d-wrapper" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
             <motion.div
               initial={{ opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1 }}

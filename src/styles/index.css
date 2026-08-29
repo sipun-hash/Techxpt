@@ -1951,6 +1951,13 @@ img {
   }
 }
 
+/* Responsive Hero 3D Object Visibility */
+@media (max-width: 991px) {
+  .hero-3d-wrapper {
+    display: none !important;
+  }
+}
+
 
 
 

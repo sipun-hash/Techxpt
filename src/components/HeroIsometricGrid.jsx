@@ -59,7 +59,7 @@ export default function HeroIsometricGrid({ onStartProject }) {
       onMouseLeave={handleMouseLeave}
       style={{
         width: '100%',
-        maxWidth: '540px',
+        maxWidth: '430px',
         aspectRatio: '1 / 1',
         position: 'relative',
         display: 'flex',
@@ -67,7 +67,7 @@ export default function HeroIsometricGrid({ onStartProject }) {
         justifyContent: 'center',
         perspective: '1200px',
         userSelect: 'none',
-        padding: '1rem',
+        padding: '0.5rem',
         boxSizing: 'border-box'
       }}
     >
