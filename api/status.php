@@ -12,20 +12,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-$settings_file = __DIR__ . '/system_settings.json';
+require_once 'db.php';
 
-if (file_exists($settings_file)) {
-    $settings = json_decode(file_get_contents($settings_file), true);
-} else {
-    $settings = [
-        "maintenance_mode" => false,
-        "maintenance_message" => "TECHXPT is undergoing system maintenance.",
-        "maintenance_eta" => "1 Hour",
-        "pause_submissions" => false,
-        "announcement_active" => false,
-        "announcement_text" => ""
-    ];
-}
+$settings = getSystemSettings($conn);
 
 echo json_encode([
     "status" => "success",

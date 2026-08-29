@@ -45,23 +45,7 @@ require_once 'db.php';
 $ADMIN_USER = getenv('ADMIN_USER') ?: 'admin';
 $ADMIN_PASS = getenv('ADMIN_PASS') ?: 'TechXpt@2026Secure';
 
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-
-$settings_file = __DIR__ . '/system_settings.json';
-if (!file_exists($settings_file)) {
-    file_put_contents($settings_file, json_encode([
-        "maintenance_mode" => false,
-        "maintenance_message" => "TECHXPT is currently undergoing scheduled maintenance. We will be back online shortly.",
-        "maintenance_eta" => "1 Hour",
-        "pause_submissions" => false,
-        "announcement_active" => false,
-        "announcement_text" => "",
-        "last_updated" => date('Y-m-d H:i:s')
-    ], JSON_PRETTY_PRINT));
-}
-$sys = json_decode(file_get_contents($settings_file), true);
+$sys = getSystemSettings($conn);
 
 // Rate Limiting
 if (!isset($_SESSION['login_attempts'])) {
@@ -132,8 +116,8 @@ if ($is_logged_in) {
             $sys['announcement_text'] = trim($_POST['announcement_text'] ?? '');
             $sys['last_updated'] = date('Y-m-d H:i:s');
 
-            file_put_contents($settings_file, json_encode($sys, JSON_PRETTY_PRINT));
-            $notification = "Emergency settings successfully updated!";
+            saveSystemSettings($conn, $sys);
+            $notification = "Emergency settings successfully updated and saved to cloud database!";
         }
     }
 

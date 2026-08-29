@@ -18,20 +18,17 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$settings_file = __DIR__ . '/system_settings.json';
-if (file_exists($settings_file)) {
-    $sys = json_decode(file_get_contents($settings_file), true);
-    if (!empty($sys['maintenance_mode']) || !empty($sys['pause_submissions'])) {
-        http_response_code(503);
-        echo json_encode([
-            "status" => "error",
-            "message" => !empty($sys['maintenance_message']) ? $sys['maintenance_message'] : "Internship applications are temporarily paused for scheduled maintenance."
-        ]);
-        exit;
-    }
-}
-
 require_once 'db.php';
+
+$sys = getSystemSettings($conn);
+if (!empty($sys['maintenance_mode']) || !empty($sys['pause_submissions'])) {
+    http_response_code(503);
+    echo json_encode([
+        "status" => "error",
+        "message" => !empty($sys['maintenance_message']) ? $sys['maintenance_message'] : "Internship applications are temporarily paused for scheduled maintenance."
+    ]);
+    exit;
+}
 
 $rawInput = file_get_contents('php://input');
 $data = json_decode($rawInput, true);
