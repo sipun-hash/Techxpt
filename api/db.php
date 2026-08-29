@@ -7,12 +7,39 @@ if (file_exists(__DIR__ . '/config.php')) {
     include_once __DIR__ . '/config.php';
 }
 
+function getEnvValue($key, $default = '') {
+    if (isset($_ENV[$key]) && $_ENV[$key] !== '') return $_ENV[$key];
+    if (isset($_SERVER[$key]) && $_SERVER[$key] !== '') return $_SERVER[$key];
+    $val = getenv($key);
+    if ($val !== false && $val !== '') return $val;
+    
+    // Check Docker / Linux container PID 1 environment if available
+    static $procEnv = null;
+    if ($procEnv === null && @file_exists('/proc/1/environ')) {
+        $procEnv = [];
+        $raw = @file_get_contents('/proc/1/environ');
+        if ($raw) {
+            $lines = explode("\0", $raw);
+            foreach ($lines as $line) {
+                if (strpos($line, '=') !== false) {
+                    list($k, $v) = explode('=', $line, 2);
+                    $procEnv[$k] = $v;
+                }
+            }
+        }
+    }
+    if (is_array($procEnv) && isset($procEnv[$key]) && $procEnv[$key] !== '') {
+        return $procEnv[$key];
+    }
+    return $default;
+}
+
 // 2. Load from environment variables if set (e.g. on Render / Cloud hosting)
-$host = getenv('DB_HOST') ?: (isset($host) ? $host : 'localhost');
-$port = getenv('DB_PORT') ?: (isset($port) ? $port : '3306');
-$dbname = getenv('DB_NAME') ?: (isset($dbname) ? $dbname : 'defaultdb');
-$username = getenv('DB_USER') ?: (isset($username) ? $username : 'avnadmin');
-$password = getenv('DB_PASSWORD') ?: (isset($password) ? $password : '');
+$host = getEnvValue('DB_HOST', isset($host) ? $host : 'localhost');
+$port = getEnvValue('DB_PORT', isset($port) ? $port : '3306');
+$dbname = getEnvValue('DB_NAME', isset($dbname) ? $dbname : 'defaultdb');
+$username = getEnvValue('DB_USER', isset($username) ? $username : 'avnadmin');
+$password = getEnvValue('DB_PASSWORD', isset($password) ? $password : '');
 
 try {
     $options = [
@@ -57,7 +84,9 @@ function getSystemSettings($conn) {
             "pause_submissions" => !empty($rows['pause_submissions']) && $rows['pause_submissions'] === '1',
             "announcement_active" => !empty($rows['announcement_active']) && $rows['announcement_active'] === '1',
             "announcement_text" => $rows['announcement_text'] ?? "",
-            "admin_google_emails" => $rows['admin_google_emails'] ?? (getenv('ADMIN_GOOGLE_EMAILS') ?: ''),
+            "admin_google_emails" => $rows['admin_google_emails'] ?? getEnvValue('ADMIN_GOOGLE_EMAILS', ''),
+            "admin_user" => $rows['admin_user'] ?? getEnvValue('ADMIN_USER', 'admin'),
+            "admin_pass" => $rows['admin_pass'] ?? getEnvValue('ADMIN_PASS', 'TechXpt@2026Secure'),
             "last_updated" => $rows['last_updated'] ?? date('Y-m-d H:i:s')
         ];
     } catch (Exception $e) {
@@ -68,7 +97,9 @@ function getSystemSettings($conn) {
             "pause_submissions" => false,
             "announcement_active" => false,
             "announcement_text" => "",
-            "admin_google_emails" => getenv('ADMIN_GOOGLE_EMAILS') ?: '',
+            "admin_google_emails" => getEnvValue('ADMIN_GOOGLE_EMAILS', ''),
+            "admin_user" => getEnvValue('ADMIN_USER', 'admin'),
+            "admin_pass" => getEnvValue('ADMIN_PASS', 'TechXpt@2026Secure'),
             "last_updated" => date('Y-m-d H:i:s')
         ];
     }
@@ -94,11 +125,13 @@ function saveSystemSettings($conn, $settings) {
             'announcement_active' => !empty($settings['announcement_active']) ? '1' : '0',
             'announcement_text' => $settings['announcement_text'] ?? '',
             'admin_google_emails' => $settings['admin_google_emails'] ?? '',
+            'admin_user' => $settings['admin_user'] ?? '',
+            'admin_pass' => $settings['admin_pass'] ?? '',
             'last_updated' => date('Y-m-d H:i:s')
         ];
 
-        foreach ($map as $k => $v) {
-            $stmt->execute([':k' => $k, ':v' => $v, ':v2' => $v]);
+        foreach ($map as $key => $val) {
+            $stmt->execute([':k' => $key, ':v' => $val, ':v2' => $val]);
         }
         return true;
     } catch (Exception $e) {

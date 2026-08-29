@@ -52,15 +52,15 @@ $_SESSION['LAST_ACTIVITY'] = time();
 // -------------------------------------------------------------
 require_once 'db.php';
 
-$ADMIN_USER = getenv('ADMIN_USER') ?: 'admin';
-$ADMIN_PASS = getenv('ADMIN_PASS') ?: 'TechXpt@2026Secure';
+$sys = getSystemSettings($conn);
+
+$ADMIN_USER = !empty($sys['admin_user']) ? $sys['admin_user'] : getEnvValue('ADMIN_USER', 'admin');
+$ADMIN_PASS = !empty($sys['admin_pass']) ? $sys['admin_pass'] : getEnvValue('ADMIN_PASS', 'TechXpt@2026Secure');
 
 // Firebase Config
-$FIREBASE_API_KEY = getenv('FIREBASE_API_KEY') ?: 'AIzaSyBp_Z9sF3-HJX0bYHKa3TLu6FFp4I8aK6g';
-$FIREBASE_PROJECT_ID = getenv('FIREBASE_PROJECT_ID') ?: 'techxpt';
-$ADMIN_GOOGLE_EMAILS = getenv('ADMIN_GOOGLE_EMAILS') ?: ''; // Optional comma-separated whitelist
-
-$sys = getSystemSettings($conn);
+$FIREBASE_API_KEY = getEnvValue('FIREBASE_API_KEY', 'AIzaSyBp_Z9sF3-HJX0bYHKa3TLu6FFp4I8aK6g');
+$FIREBASE_PROJECT_ID = getEnvValue('FIREBASE_PROJECT_ID', 'techxpt');
+$ADMIN_GOOGLE_EMAILS = !empty($sys['admin_google_emails']) ? $sys['admin_google_emails'] : getEnvValue('ADMIN_GOOGLE_EMAILS', '');
 
 // Rate Limiting
 if (!isset($_SESSION['login_attempts'])) {
@@ -210,7 +210,7 @@ $is_logged_in = !empty($_SESSION['authenticated']) && $_SESSION['authenticated']
 $notification = '';
 if ($is_logged_in) {
     
-    // Save Emergency Settings & Whitelist
+    // Save Emergency Settings & Whitelist & Master Credentials
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_emergency') {
         if (isset($_POST['csrf_token']) && hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
             $sys['maintenance_mode'] = isset($_POST['maintenance_mode']);
@@ -220,10 +220,18 @@ if ($is_logged_in) {
             $sys['announcement_active'] = isset($_POST['announcement_active']);
             $sys['announcement_text'] = trim($_POST['announcement_text'] ?? '');
             $sys['admin_google_emails'] = trim($_POST['admin_google_emails'] ?? '');
+
+            if (!empty($_POST['custom_admin_user'])) {
+                $sys['admin_user'] = trim($_POST['custom_admin_user']);
+            }
+            if (!empty($_POST['custom_admin_pass'])) {
+                $sys['admin_pass'] = trim($_POST['custom_admin_pass']);
+            }
+
             $sys['last_updated'] = date('Y-m-d H:i:s');
 
             saveSystemSettings($conn, $sys);
-            $notification = "Emergency settings and Google email whitelist successfully updated!";
+            $notification = "Settings, Google Whitelist, and Master Credentials successfully saved to database!";
         }
     }
 
@@ -1739,6 +1747,25 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                                 Comma-separated list of approved Google emails allowed to log in (e.g. <code>yourname@gmail.com, ceo@techxpt.com</code>). If empty, any verified Google account can sign in.
                             </div>
                             <input type="text" name="admin_google_emails" value="<?= safe($sys['admin_google_emails'] ?? '') ?>" placeholder="e.g. your-email@gmail.com, ceo@techxpt.com">
+                        </div>
+
+                        <div style="border-top: 1px solid var(--border); margin-top: 1.25rem; padding-top: 1.25rem;">
+                            <div style="font-size: 0.82rem; font-weight: 800; text-transform: uppercase; color: var(--text-primary); margin-bottom: 0.3rem;">
+                                🔑 Master Fallback Credentials
+                            </div>
+                            <div style="font-size: 0.74rem; color: var(--text-secondary); margin-bottom: 0.85rem; line-height: 1.4;">
+                                Change your fallback master username and password. Saved to database immediately.
+                            </div>
+
+                            <div class="form-group">
+                                <label>Master Username</label>
+                                <input type="text" name="custom_admin_user" value="<?= safe($ADMIN_USER) ?>" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Master Password (Leave blank to keep current)</label>
+                                <input type="text" name="custom_admin_pass" placeholder="Enter new password or leave blank">
+                            </div>
                         </div>
 
                         <button type="submit" class="btn-primary" style="margin-top: 0.75rem;">
