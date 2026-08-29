@@ -5,15 +5,18 @@
 // Zero Border-Radius (0px Sharp Architectural Styling) & Fully Responsive
 
 // -------------------------------------------------------------
-// 1. Security Headers
+// 1. Error Handling & Security Headers
 // -------------------------------------------------------------
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
+ini_set('display_errors', '0');
+
 header("X-Frame-Options: DENY");
 header("X-Content-Type-Options: nosniff");
 header("X-XSS-Protection: 1; mode=block");
 header("Referrer-Policy: strict-origin-when-cross-origin");
 
 // -------------------------------------------------------------
-// 2. Session Management & CSRF
+// 2. Session Management & CSRF Setup
 // -------------------------------------------------------------
 $is_https = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') 
     || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
@@ -30,10 +33,17 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Ensure CSRF Token always exists
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+// 60-minute inactivity auto-logout
 if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY']) > 3600) {
     session_unset();
     session_destroy();
     session_start();
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 $_SESSION['LAST_ACTIVITY'] = time();
 
@@ -109,7 +119,7 @@ if ($is_logged_in) {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_emergency') {
         if (isset($_POST['csrf_token']) && hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
             $sys['maintenance_mode'] = isset($_POST['maintenance_mode']);
-            $sys['maintenance_message'] = trim($_POST['maintenance_message'] ?? 'TECHXPT is undergoing system maintenance.');
+            $sys['maintenance_message'] = trim($_POST['maintenance_message'] ?? 'TECHXPT is undergoing scheduled maintenance.');
             $sys['maintenance_eta'] = trim($_POST['maintenance_eta'] ?? '1 Hour');
             $sys['pause_submissions'] = isset($_POST['pause_submissions']);
             $sys['announcement_active'] = isset($_POST['announcement_active']);
@@ -238,9 +248,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        /* -------------------------------------------------------------
-           STRICT 3-COLOR THEME TOKENS: RED, BLACK, WHITE (ZERO BORDER-RADIUS)
-           ------------------------------------------------------------- */
+        /* STRICT 3-COLOR PALETTE: RED (#FF2424), BLACK (#0A0A0A), WHITE (#FFFFFF) */
         :root {
             --red: #FF2424;
             --red-hover: #D81818;
@@ -290,9 +298,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             transition: background-color 0.2s ease, color 0.2s ease;
         }
 
-        /* -------------------------------------------------------------
-           LOGIN SCREEN
-           ------------------------------------------------------------- */
+        /* Login Screen */
         .login-wrap {
             display: flex;
             align-items: center;
@@ -332,9 +338,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             margin-top: 0.25rem;
         }
 
-        /* -------------------------------------------------------------
-           FORM CONTROLS & BUTTONS
-           ------------------------------------------------------------- */
+        /* Form Controls */
         .form-group { margin-bottom: 1.25rem; }
         label {
             display: block;
@@ -423,9 +427,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             margin-bottom: 1.25rem;
         }
 
-        /* -------------------------------------------------------------
-           TOP NAVIGATION BAR & THEME TOGGLE
-           ------------------------------------------------------------- */
+        /* Topbar */
         .topbar {
             background: var(--surface);
             border-bottom: 1px solid var(--border);
@@ -494,9 +496,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             font-weight: 700;
         }
 
-        /* -------------------------------------------------------------
-           MOBILE NAVIGATION DRAWER
-           ------------------------------------------------------------- */
+        /* Mobile Menu */
         .mobile-menu {
             display: none;
             flex-direction: column;
@@ -524,9 +524,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             border-color: var(--red);
         }
 
-        /* -------------------------------------------------------------
-           MAIN CONTENT AREA & STATS CARDS
-           ------------------------------------------------------------- */
+        /* Main Container */
         .main-container {
             max-width: 1400px;
             width: 100%;
@@ -575,9 +573,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             text-transform: uppercase;
         }
 
-        /* -------------------------------------------------------------
-           DESKTOP NAVIGATION TABS & ACTIONS
-           ------------------------------------------------------------- */
+        /* Desktop Tabs */
         .tabs-bar {
             display: flex;
             align-items: center;
@@ -617,9 +613,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             max-width: 400px;
         }
 
-        /* -------------------------------------------------------------
-           TABLE & LIST VIEW
-           ------------------------------------------------------------- */
+        /* Table */
         .table-wrap {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -689,9 +683,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             flex-wrap: wrap;
         }
 
-        /* -------------------------------------------------------------
-           EMERGENCY COMMAND CENTER CARDS
-           ------------------------------------------------------------- */
+        /* Emergency Cards */
         .emergency-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -747,7 +739,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             color: var(--text-secondary);
         }
 
-        /* Custom Toggle Checkbox */
+        /* Toggle Checkbox */
         .custom-toggle {
             position: relative;
             display: inline-block;
@@ -785,9 +777,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             transform: translateX(22px);
         }
 
-        /* -------------------------------------------------------------
-           MODAL POPUP (ZERO BORDER-RADIUS)
-           ------------------------------------------------------------- */
+        /* Modal */
         .modal-bg {
             position: fixed;
             inset: 0;
@@ -861,9 +851,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             text-transform: uppercase;
         }
 
-        /* -------------------------------------------------------------
-           RESPONSIVE MOBILE BREAKPOINTS
-           ------------------------------------------------------------- */
         @media (max-width: 860px) {
             .desktop-tabs { display: none; }
             .hamburger-btn { display: inline-flex; }
@@ -887,7 +874,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
 
             <form method="POST" action="admin.php">
                 <input type="hidden" name="action" value="login">
-                <input type="hidden" name="csrf_token" value="<?= safe($_SESSION['csrf_token']) ?>">
+                <input type="hidden" name="csrf_token" value="<?= safe($_SESSION['csrf_token'] ?? '') ?>">
 
                 <div class="form-group">
                     <label>Username</label>
@@ -917,17 +904,14 @@ $active_tab = $_GET['tab'] ?? 'contacts';
         </div>
 
         <div class="topbar-actions">
-            <!-- Theme Toggle Button -->
             <button onclick="toggleTheme()" class="theme-btn" id="themeBtn" title="Toggle Dark/Light Mode">
                 Theme: <span id="themeText">Dark</span>
             </button>
 
-            <!-- Logout Button -->
             <a href="admin.php?action=logout" class="btn-outline btn-red" style="padding: 0.45rem 0.8rem;">
                 Sign Out
             </a>
 
-            <!-- Mobile Menu Toggle Button -->
             <button onclick="toggleMobileMenu()" class="hamburger-btn" aria-label="Toggle Menu">
                 ☰
             </button>
@@ -987,7 +971,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
 
         <!-- Navigation Tabs & Search Controls -->
         <div class="tabs-bar">
-            <!-- Desktop Tabs -->
             <div class="desktop-tabs">
                 <a href="admin.php?tab=contacts" class="tab-btn <?= $active_tab === 'contacts' ? 'active' : '' ?>">
                     Contact Leads (<?= count($contacts) ?>)
@@ -1000,7 +983,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                 </a>
             </div>
 
-            <!-- Search & Export -->
             <?php if ($active_tab !== 'emergency'): ?>
                 <div style="display: flex; gap: 0.65rem; flex-wrap: wrap; flex: 1; justify-content: flex-end;">
                     <div class="search-wrap">
@@ -1190,7 +1172,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
         <?php else: ?>
             <div class="emergency-grid">
 
-                <!-- 1. Maintenance Mode & Form Freeze -->
                 <div class="emergency-card danger">
                     <div class="card-header-title">🚨 Site Operations & Maintenance</div>
                     <div class="card-subtext">
@@ -1201,7 +1182,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                         <input type="hidden" name="action" value="save_emergency">
                         <input type="hidden" name="csrf_token" value="<?= safe($_SESSION['csrf_token']) ?>">
 
-                        <!-- Switch 1: Maintenance Mode -->
                         <div class="switch-row">
                             <div>
                                 <div class="switch-title">Maintenance Mode</div>
@@ -1213,7 +1193,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                             </label>
                         </div>
 
-                        <!-- Switch 2: Pause Submissions -->
                         <div class="switch-row">
                             <div>
                                 <div class="switch-title">Pause Form Inquiries</div>
@@ -1225,7 +1204,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                             </label>
                         </div>
 
-                        <!-- Maintenance Message Field -->
                         <div class="form-group">
                             <label>Maintenance Notice Text</label>
                             <textarea name="maintenance_message" rows="2"><?= safe($sys['maintenance_message'] ?? '') ?></textarea>
@@ -1236,7 +1214,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                             <input type="text" name="maintenance_eta" value="<?= safe($sys['maintenance_eta'] ?? '1 Hour') ?>" placeholder="e.g. 2 Hours / 10:00 PM">
                         </div>
 
-                        <!-- Switch 3: Site Announcement -->
                         <div class="switch-row" style="margin-top: 1.25rem;">
                             <div>
                                 <div class="switch-title">Broadcast Site Notice</div>
@@ -1259,14 +1236,12 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                     </form>
                 </div>
 
-                <!-- 2. Diagnostics & Quick Recovery Actions -->
                 <div class="emergency-card">
                     <div class="card-header-title">⚡ Cloud Diagnostics & Backups</div>
                     <div class="card-subtext">
                         Run health checks, export complete data backups, or unlock rate-limited administrators.
                     </div>
 
-                    <!-- Cloud Ping Diagnostics -->
                     <div style="background: var(--bg); border: 1px solid var(--border); padding: 1rem; margin-bottom: 1.25rem;">
                         <div style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.5rem;">
                             Database Diagnostics
@@ -1285,7 +1260,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                         </div>
                     </div>
 
-                    <!-- Full Backup Download -->
                     <div style="margin-bottom: 1.5rem;">
                         <div style="font-size: 0.85rem; font-weight: 800; text-transform: uppercase; color: var(--text-primary); margin-bottom: 0.35rem;">
                             Full System Backup
@@ -1298,7 +1272,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                         </a>
                     </div>
 
-                    <!-- Security Rate-Limiter Reset -->
                     <div>
                         <div style="font-size: 0.85rem; font-weight: 800; text-transform: uppercase; color: var(--text-primary); margin-bottom: 0.35rem;">
                             Security Lockout Reset
@@ -1322,7 +1295,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
 
     </main>
 
-    <!-- 🔍 MODAL OVERVIEW (ZERO BORDER-RADIUS) -->
+    <!-- 🔍 MODAL OVERVIEW -->
     <div id="detailModal" class="modal-bg" onclick="if(event.target === this) closeDetailModal();">
         <div class="modal-box">
             <div class="modal-head">
@@ -1341,9 +1314,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
     </div>
 
     <script>
-        // -------------------------------------------------------------
-        // Theme Toggle (Dark / Light with LocalStorage)
-        // -------------------------------------------------------------
         function initTheme() {
             const saved = localStorage.getItem('techxpt-admin-theme') || 'dark';
             document.documentElement.setAttribute('data-theme', saved);
@@ -1360,17 +1330,11 @@ $active_tab = $_GET['tab'] ?? 'contacts';
 
         initTheme();
 
-        // -------------------------------------------------------------
-        // Mobile Menu Toggle
-        // -------------------------------------------------------------
         function toggleMobileMenu() {
             const menu = document.getElementById('mobileMenu');
             menu.classList.toggle('open');
         }
 
-        // -------------------------------------------------------------
-        // Real-Time Search Filter
-        // -------------------------------------------------------------
         function searchRows() {
             const term = document.getElementById('searchInput').value.toLowerCase();
             const rows = document.querySelectorAll('.row-item');
@@ -1379,9 +1343,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             });
         }
 
-        // -------------------------------------------------------------
-        // Modal Details
-        // -------------------------------------------------------------
         function openDetailModal(data) {
             document.getElementById('modalHeading').innerText = data.title || 'Details';
             let html = `
