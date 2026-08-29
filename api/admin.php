@@ -119,18 +119,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
         exit;
     }
 
-    // Check Whitelist from Database settings or Environment Variable
+    // Strict Whitelist Enforcement from Database settings or Environment Variable
     $effectiveWhitelist = !empty($sys['admin_google_emails']) ? $sys['admin_google_emails'] : $ADMIN_GOOGLE_EMAILS;
-    if (!empty($effectiveWhitelist)) {
-        $allowedList = array_map('trim', explode(',', strtolower($effectiveWhitelist)));
-        if (!in_array($authenticatedEmail, $allowedList)) {
-            http_response_code(403);
-            echo json_encode([
-                "status" => "error", 
-                "message" => "Access Denied: $authenticatedEmail is not an authorized administrator. Please use an approved admin Google account."
-            ]);
-            exit;
-        }
+    
+    // If no whitelist is configured, reject all Google sign-ins by default to prevent open access
+    if (empty(trim($effectiveWhitelist))) {
+        http_response_code(403);
+        echo json_encode([
+            "status" => "error", 
+            "message" => "Google Login is restricted. No authorized admin Google accounts have been whitelisted yet. Please sign in with Master Credentials and configure your approved Google email under Emergency Controls."
+        ]);
+        exit;
+    }
+
+    $allowedList = array_filter(array_map('trim', explode(',', strtolower($effectiveWhitelist))));
+    if (!in_array($authenticatedEmail, $allowedList)) {
+        http_response_code(403);
+        echo json_encode([
+            "status" => "error", 
+            "message" => "Access Denied: $authenticatedEmail is not an authorized administrator. Please use an approved admin Google account."
+        ]);
+        exit;
     }
 
     // Success - Grant Admin Access
@@ -1177,6 +1186,8 @@ $active_tab = $_GET['tab'] ?? 'contacts';
 
             try {
                 const provider = new firebase.auth.GoogleAuthProvider();
+                provider.setCustomParameters({ prompt: 'select_account' });
+
                 const result = await firebase.auth().signInWithPopup(provider);
                 const idToken = await result.user.getIdToken();
 
@@ -1187,13 +1198,15 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                 });
 
                 const resData = await response.json();
-                if (resData.status === 'success') {
+                if (response.ok && resData.status === 'success') {
                     window.location.href = resData.redirect || 'admin.php';
                 } else {
-                    throw new Error(resData.message || 'Authentication rejected.');
+                    await firebase.auth().signOut();
+                    throw new Error(resData.message || 'Authentication rejected by security policy.');
                 }
             } catch (err) {
                 console.error(err);
+                try { await firebase.auth().signOut(); } catch(e) {}
                 if (errBox) {
                     errBox.innerText = err.message || 'Google Sign-In failed. Please try again.';
                     errBox.style.display = 'block';
