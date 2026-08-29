@@ -1793,6 +1793,11 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                             </label>
                         </div>
 
+                        <div class="form-group">
+                            <label>Broadcast Notice Text</label>
+                            <textarea name="announcement_text" rows="2" placeholder="e.g. 🚀 Welcome to TECHXPT! Scheduled system upgrade at 11:00 PM."><?= safe($sys['announcement_text'] ?? '') ?></textarea>
+                        </div>
+
                         <div class="form-group" style="margin-top: 1.25rem;">
                             <label>Authorized Google Admin Accounts (Whitelist)</label>
                             <div style="font-size: 0.74rem; color: var(--text-secondary); margin-bottom: 0.35rem; line-height: 1.4;">
