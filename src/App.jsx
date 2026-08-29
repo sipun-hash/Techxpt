@@ -277,25 +277,7 @@ export default function App() {
           {/* Dynamic Context Custom Cursor (Desktop Only) */}
           <CustomCursor cursorMode={cursorMode} cursorText={cursorText} />
 
-          {/* Emergency Site Announcement Banner */}
-          {systemStatus.announcement_active && systemStatus.announcement_text && (
-            <div style={{
-              backgroundColor: '#FF2424',
-              color: '#FFFFFF',
-              padding: '0.65rem 1rem',
-              fontSize: '0.8rem',
-              fontWeight: 800,
-              letterSpacing: '0.04em',
-              textAlign: 'center',
-              textTransform: 'uppercase',
-              position: 'relative',
-              zIndex: 100
-            }}>
-              🚨 NOTICE: {systemStatus.announcement_text}
-            </div>
-          )}
-
-          {/* Sticky Minimal Navbar */}
+          {/* Sticky Minimal Navbar with Integrated Emergency Announcement Bar */}
           <Navbar 
             currentRoute={currentRoute}
             setCurrentRoute={handleNavigate}
@@ -303,6 +285,7 @@ export default function App() {
             theme={theme}
             onToggleTheme={toggleTheme}
             isIntroRunning={showIntro}
+            announcement={systemStatus.announcement_active && systemStatus.announcement_text ? systemStatus.announcement_text : null}
           />
 
       {/* Main Content Router - 100% Full-Screen Dedicated Pages */}

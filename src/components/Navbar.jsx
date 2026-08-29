@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Logo from './Logo';
 import { ArrowUpRight, Menu, X, Sun, Moon } from 'lucide-react';
 
-export default function Navbar({ currentRoute, setCurrentRoute, onOpenContact, theme, onToggleTheme, isIntroRunning }) {
+export default function Navbar({ currentRoute, setCurrentRoute, onOpenContact, theme, onToggleTheme, isIntroRunning, announcement }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -41,26 +41,56 @@ export default function Navbar({ currentRoute, setCurrentRoute, onOpenContact, t
           left: 0,
           right: 0,
           zIndex: 1000,
-          height: 'var(--nav-height)',
           backgroundColor: scrolled ? 'var(--nav-bg-scrolled)' : 'var(--nav-bg)',
           borderBottom: scrolled ? '1px solid var(--border)' : '1px solid transparent',
           transition: 'background-color 0.25s ease, border-bottom 0.25s ease',
           display: 'flex',
-          alignItems: 'center',
-          overflow: 'hidden'
+          flexDirection: 'column'
         }}
       >
-        <div 
-          className="container" 
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between',
-            gap: '1rem',
+        {/* Emergency Announcement Broadcast Bar */}
+        {announcement && (
+          <div style={{
             width: '100%',
-            height: '100%'
+            backgroundColor: '#FF2424',
+            color: '#FFFFFF',
+            padding: '0.45rem 1rem',
+            fontSize: '0.78rem',
+            fontWeight: 800,
+            letterSpacing: '0.05em',
+            textAlign: 'center',
+            textTransform: 'uppercase',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            zIndex: 1001,
+            boxShadow: '0 2px 10px rgba(255, 36, 36, 0.4)'
+          }}>
+            <span style={{ fontSize: '0.9rem' }}>🚨</span>
+            <span>NOTICE: {announcement}</span>
+          </div>
+        )}
+
+        <div 
+          style={{
+            height: 'var(--nav-height)',
+            display: 'flex',
+            alignItems: 'center',
+            width: '100%'
           }}
         >
+          <div 
+            className="container" 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              gap: '1rem',
+              width: '100%',
+              height: '100%'
+            }}
+          >
           
           {/* Brand Logo Anchor - Measured dynamically by IntroAnimation */}
           <div
