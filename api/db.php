@@ -138,3 +138,50 @@ function saveSystemSettings($conn, $settings) {
         return false;
     }
 }
+
+// -------------------------------------------------------------
+// Real-Time Live Website Visitor Tracker
+// -------------------------------------------------------------
+function trackLiveVisitor($conn) {
+    try {
+        $conn->exec("CREATE TABLE IF NOT EXISTS active_visitors (
+            visitor_id VARCHAR(64) PRIMARY KEY,
+            ip_address VARCHAR(45),
+            user_agent VARCHAR(255),
+            last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )");
+
+        $ip = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+        $ua = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 250);
+        $visitor_id = hash('sha256', $ip . '_' . $ua);
+
+        $stmt = $conn->prepare("INSERT INTO active_visitors (visitor_id, ip_address, user_agent, last_seen) 
+            VALUES (:id, :ip, :ua, NOW()) 
+            ON DUPLICATE KEY UPDATE last_seen = NOW()");
+        $stmt->execute([
+            ':id' => $visitor_id,
+            ':ip' => substr($ip, 0, 45),
+            ':ua' => $ua
+        ]);
+
+        // Cleanup stale visitors (older than 60 seconds) with 10% probability
+        if (rand(1, 10) === 1) {
+            $conn->exec("DELETE FROM active_visitors WHERE last_seen < NOW() - INTERVAL 90 SECOND");
+        }
+    } catch (Exception $e) {}
+}
+
+function getActiveVisitorsCount($conn) {
+    try {
+        $conn->exec("CREATE TABLE IF NOT EXISTS active_visitors (
+            visitor_id VARCHAR(64) PRIMARY KEY,
+            ip_address VARCHAR(45),
+            user_agent VARCHAR(255),
+            last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )");
+        $stmt = $conn->query("SELECT COUNT(*) FROM active_visitors WHERE last_seen >= NOW() - INTERVAL 60 SECOND");
+        return max(1, (int)$stmt->fetchColumn()); // At least current viewer/session
+    } catch (Exception $e) {
+        return 1;
+    }
+}

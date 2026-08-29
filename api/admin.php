@@ -327,17 +327,19 @@ if ($is_logged_in) {
             if (strpos($in['created_at'], $today) === 0) $today_interns++;
         }
 
-        // Calculate Real Admin Count & Total User Counts
+        // Calculate Real Admin Count, Total User Counts, and Live Website Visitors
         $whitelist_raw = !empty($sys['admin_google_emails']) ? $sys['admin_google_emails'] : getEnvValue('ADMIN_GOOGLE_EMAILS', '');
         $whitelist_emails = array_filter(array_map('trim', explode(',', $whitelist_raw)));
         $total_admins = 1 + count($whitelist_emails); // 1 Master Administrator + Whitelisted Google Accounts
         $total_users = count($contacts) + count($internships);
+        $active_online_users = getActiveVisitorsCount($conn);
 
     } catch (PDOException $e) {
         $contacts = [];
         $internships = [];
         $total_admins = 1;
         $total_users = 0;
+        $active_online_users = 1;
     }
 }
 
@@ -1300,16 +1302,19 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             </div>
         <?php endif; ?>
 
-        <!-- System Real-Time Stats Overview (Real Admins & Users) -->
+        <!-- System Real-Time Live Metrics (Live Website Users & Real Admins) -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 1.15rem; padding: 0.85rem; background: var(--bg); border: 1px solid var(--border);">
             <div>
-                <div style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Total Users</div>
-                <div style="font-size: 1.35rem; font-weight: 900; color: var(--text-primary); line-height: 1.1;"><?= $total_users ?></div>
-                <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 2px;">Leads + Interns</div>
+                <div style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; display: flex; align-items: center; gap: 5px;">
+                    <span style="display: inline-block; width: 7px; height: 7px; background-color: #22C55E; box-shadow: 0 0 6px #22C55E;"></span>
+                    <span>Live Users</span>
+                </div>
+                <div style="font-size: 1.35rem; font-weight: 900; color: #22C55E; line-height: 1.1; margin-top: 3px;"><?= $active_online_users ?></div>
+                <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 2px;">Active on Website</div>
             </div>
             <div>
                 <div style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Real Admins</div>
-                <div style="font-size: 1.35rem; font-weight: 900; color: var(--red); line-height: 1.1;"><?= $total_admins ?></div>
+                <div style="font-size: 1.35rem; font-weight: 900; color: var(--red); line-height: 1.1; margin-top: 3px;"><?= $total_admins ?></div>
                 <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 2px;">1 Master + <?= count($whitelist_emails) ?> Google</div>
             </div>
         </div>
@@ -1358,6 +1363,14 @@ $active_tab = $_GET['tab'] ?? 'contacts';
         <!-- Top Stats Cards -->
         <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
             <div class="stat-card">
+                <div class="stat-label" style="display: flex; align-items: center; justify-content: space-between;">
+                    <span>Live Users Online</span>
+                    <span style="display: inline-block; width: 7px; height: 7px; background-color: #22C55E; box-shadow: 0 0 8px #22C55E;"></span>
+                </div>
+                <div class="stat-val" style="color: #22C55E;"><?= $active_online_users ?></div>
+                <div class="stat-sub" style="color: var(--text-muted);">Browsing Site Right Now</div>
+            </div>
+            <div class="stat-card">
                 <div class="stat-label">Contact Leads</div>
                 <div class="stat-val"><?= count($contacts) ?></div>
                 <div class="stat-sub">+<?= $today_contacts ?> New Today</div>
@@ -1366,11 +1379,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                 <div class="stat-label">Internship Applicants</div>
                 <div class="stat-val"><?= count($internships) ?></div>
                 <div class="stat-sub">+<?= $today_interns ?> New Today</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Total Users / Inquiries</div>
-                <div class="stat-val"><?= $total_users ?></div>
-                <div class="stat-sub" style="color: var(--text-muted);">Active Submissions</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Authorized Admins</div>

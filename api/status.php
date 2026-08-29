@@ -14,6 +14,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once 'db.php';
 
+// Record live visitor ping
+trackLiveVisitor($conn);
+
 $settings = getSystemSettings($conn);
 
 echo json_encode([
@@ -24,5 +27,6 @@ echo json_encode([
     "pause_submissions" => (bool)($settings['pause_submissions'] ?? false),
     "announcement_active" => (bool)($settings['announcement_active'] ?? false),
     "announcement_text" => $settings['announcement_text'] ?? '',
+    "active_online_users" => getActiveVisitorsCount($conn),
     "timestamp" => time()
 ]);
