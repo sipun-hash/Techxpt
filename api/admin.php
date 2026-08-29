@@ -499,19 +499,81 @@ $active_tab = $_GET['tab'] ?? 'contacts';
         }
 
         /* -------------------------------------------------------------
-           MOBILE MENU DRAWER
+           SMOOTH RIGHT-TO-LEFT MOBILE DRAWER
            ------------------------------------------------------------- */
-        .mobile-menu {
-            display: none;
-            flex-direction: column;
-            background: var(--surface);
-            border-bottom: 2px solid var(--red);
-            padding: 0.75rem 1rem 1.25rem 1rem;
-            gap: 0.5rem;
+        .drawer-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.3s;
+            z-index: 998;
         }
-        .mobile-menu.open { display: flex; }
+        .drawer-backdrop.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .mobile-drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: min(320px, 85vw);
+            background: var(--surface);
+            border-left: 2px solid var(--red);
+            box-shadow: -15px 0 35px rgba(0, 0, 0, 0.85);
+            transform: translateX(100%);
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            padding: 1.25rem 1.25rem 1.75rem 1.25rem;
+            overflow-y: auto;
+        }
+        .mobile-drawer.open {
+            transform: translateX(0);
+        }
+
+        .drawer-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 0.85rem;
+            margin-bottom: 1.25rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .drawer-title {
+            font-size: 1rem;
+            font-weight: 900;
+            letter-spacing: 0.05em;
+            color: var(--text-primary);
+        }
+        .drawer-title span { color: var(--red); }
+        .drawer-close {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.3rem 0.6rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .drawer-close:hover {
+            border-color: var(--red);
+            color: var(--red);
+        }
+        .drawer-links {
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+            flex: 1;
+        }
         .mobile-nav-link {
-            padding: 0.75rem 1rem;
+            padding: 0.8rem 1rem;
             color: var(--text-primary);
             text-decoration: none;
             font-weight: 700;
@@ -521,6 +583,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             display: flex;
             justify-content: space-between;
             align-items: center;
+            transition: all 0.2s;
         }
         .mobile-nav-link.active {
             background: var(--red);
@@ -974,28 +1037,44 @@ $active_tab = $_GET['tab'] ?? 'contacts';
         </div>
     </header>
 
-    <!-- Mobile Navigation Drawer -->
-    <nav id="mobileMenu" class="mobile-menu">
-        <a href="admin.php?tab=contacts" class="mobile-nav-link <?= $active_tab === 'contacts' ? 'active' : '' ?>">
-            <span>Contact Leads</span>
-            <span>(<?= count($contacts) ?>)</span>
-        </a>
-        <a href="admin.php?tab=internships" class="mobile-nav-link <?= $active_tab === 'internships' ? 'active' : '' ?>">
-            <span>Internship Applications</span>
-            <span>(<?= count($internships) ?>)</span>
-        </a>
-        <a href="admin.php?tab=emergency" class="mobile-nav-link <?= $active_tab === 'emergency' ? 'active' : '' ?>" style="color: var(--red);">
-            <span>🚨 Emergency Controls</span>
-            <span>⚙</span>
-        </a>
-        <a href="admin.php?export=<?= $active_tab === 'internships' ? 'internships' : 'contacts' ?>" class="mobile-nav-link" style="background: var(--red); color: #fff; border-color: var(--red);">
-            <span>Download CSV / Excel</span>
-            <span>⬇</span>
-        </a>
-        <a href="admin.php?action=logout" class="mobile-nav-link" style="color: var(--red); border-color: var(--red-border); margin-top: 0.25rem;">
-            <span>Sign Out</span>
-            <span>&times;</span>
-        </a>
+    <!-- Mobile Slide-In Drawer Backdrop -->
+    <div id="drawerBackdrop" class="drawer-backdrop" onclick="closeMobileDrawer()"></div>
+
+    <!-- Mobile Slide-In Right Drawer -->
+    <nav id="mobileDrawer" class="mobile-drawer">
+        <div class="drawer-header">
+            <div class="drawer-title">TECH<span>XPT</span> // MENU</div>
+            <button class="drawer-close" onclick="closeMobileDrawer()" aria-label="Close Menu">&times;</button>
+        </div>
+
+        <div class="drawer-links">
+            <a href="admin.php?tab=contacts" class="mobile-nav-link <?= $active_tab === 'contacts' ? 'active' : '' ?>">
+                <span>Contact Leads</span>
+                <span>(<?= count($contacts) ?>)</span>
+            </a>
+            <a href="admin.php?tab=internships" class="mobile-nav-link <?= $active_tab === 'internships' ? 'active' : '' ?>">
+                <span>Internship Applications</span>
+                <span>(<?= count($internships) ?>)</span>
+            </a>
+            <a href="admin.php?tab=emergency" class="mobile-nav-link <?= $active_tab === 'emergency' ? 'active' : '' ?>" style="color: var(--red);">
+                <span>🚨 Emergency Controls</span>
+                <span>⚙</span>
+            </a>
+            <a href="admin.php?export=<?= $active_tab === 'internships' ? 'internships' : 'contacts' ?>" class="mobile-nav-link" style="background: var(--red); color: #fff; border-color: var(--red);">
+                <span>Download CSV / Excel</span>
+                <span>⬇</span>
+            </a>
+        </div>
+
+        <div style="border-top: 1px solid var(--border); padding-top: 1rem; margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+            <button onclick="toggleTheme()" class="btn-outline" style="width: 100%; justify-content: space-between; padding: 0.65rem 1rem;">
+                <span>Toggle Theme</span>
+                <span id="drawerThemeText">Dark</span>
+            </button>
+            <a href="admin.php?action=logout" class="btn-outline btn-red" style="width: 100%; justify-content: center; padding: 0.65rem 1rem;">
+                Sign Out
+            </a>
+        </div>
     </nav>
 
     <main class="main-container">
@@ -1517,7 +1596,11 @@ $active_tab = $_GET['tab'] ?? 'contacts';
         function initTheme() {
             const saved = localStorage.getItem('techxpt-admin-theme') || 'dark';
             document.documentElement.setAttribute('data-theme', saved);
-            document.getElementById('themeText').innerText = saved === 'dark' ? 'Dark' : 'Light';
+            const label = saved === 'dark' ? 'Dark' : 'Light';
+            const t1 = document.getElementById('themeText');
+            if (t1) t1.innerText = label;
+            const t2 = document.getElementById('drawerThemeText');
+            if (t2) t2.innerText = label;
         }
 
         function toggleTheme() {
@@ -1525,15 +1608,43 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             const next = current === 'dark' ? 'light' : 'dark';
             document.documentElement.setAttribute('data-theme', next);
             localStorage.setItem('techxpt-admin-theme', next);
-            document.getElementById('themeText').innerText = next === 'dark' ? 'Dark' : 'Light';
+            const label = next === 'dark' ? 'Dark' : 'Light';
+            const t1 = document.getElementById('themeText');
+            if (t1) t1.innerText = label;
+            const t2 = document.getElementById('drawerThemeText');
+            if (t2) t2.innerText = label;
         }
 
         initTheme();
 
-        function toggleMobileMenu() {
-            const menu = document.getElementById('mobileMenu');
-            menu.classList.toggle('open');
+        function openMobileDrawer() {
+            document.getElementById('mobileDrawer').classList.add('open');
+            document.getElementById('drawerBackdrop').classList.add('open');
+            document.body.style.overflow = 'hidden';
         }
+
+        function closeMobileDrawer() {
+            document.getElementById('mobileDrawer').classList.remove('open');
+            document.getElementById('drawerBackdrop').classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        function toggleMobileMenu() {
+            const drawer = document.getElementById('mobileDrawer');
+            if (drawer.classList.contains('open')) {
+                closeMobileDrawer();
+            } else {
+                openMobileDrawer();
+            }
+        }
+
+        // Close on ESC key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeMobileDrawer();
+                closeDetailModal();
+            }
+        });
 
         function searchRows() {
             const term = document.getElementById('searchInput').value.toLowerCase();
