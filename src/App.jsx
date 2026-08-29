@@ -5,6 +5,8 @@ import CustomCursor from './components/CustomCursor';
 import IntroAnimation from './components/IntroAnimation';
 import ErrorBoundary from './components/ErrorBoundary';
 import ContactSidebar from './components/ContactSidebar';
+import MaintenanceScreen from './components/MaintenanceScreen';
+import { API_ENDPOINTS } from './config/api';
 
 // Pages
 import Home from './pages/Home';
@@ -65,6 +67,34 @@ export default function App() {
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('techxpt-theme') || 'light';
   });
+
+  const [systemStatus, setSystemStatus] = useState({
+    maintenance_mode: false,
+    maintenance_message: '',
+    maintenance_eta: '',
+    announcement_active: false,
+    announcement_text: ''
+  });
+
+  // Fetch Live System & Maintenance Status
+  useEffect(() => {
+    const checkSystemHealth = async () => {
+      try {
+        const res = await fetch(API_ENDPOINTS.status);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'success') {
+            setSystemStatus(data);
+          }
+        }
+      } catch (err) {
+        // Silently preserve current state
+      }
+    };
+    checkSystemHealth();
+    const interval = setInterval(checkSystemHealth, 20000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Custom cursor modes
   const [cursorMode, setCursorMode] = useState('default');
@@ -231,23 +261,49 @@ export default function App() {
         transition: 'background-color 0.3s ease, color 0.3s ease'
       }}
     >
-      {/* Cinematic Center-to-Header Intro Logo Animation */}
-      {showIntro && (
-        <IntroAnimation onComplete={() => setShowIntro(false)} />
-      )}
+      {/* 1. Maintenance Mode Overlay Screen */}
+      {systemStatus.maintenance_mode ? (
+        <MaintenanceScreen 
+          message={systemStatus.maintenance_message} 
+          eta={systemStatus.maintenance_eta} 
+        />
+      ) : (
+        <>
+          {/* Cinematic Center-to-Header Intro Logo Animation */}
+          {showIntro && (
+            <IntroAnimation onComplete={() => setShowIntro(false)} />
+          )}
 
-      {/* Dynamic Context Custom Cursor (Desktop Only) */}
-      <CustomCursor cursorMode={cursorMode} cursorText={cursorText} />
+          {/* Dynamic Context Custom Cursor (Desktop Only) */}
+          <CustomCursor cursorMode={cursorMode} cursorText={cursorText} />
 
-      {/* Sticky Minimal Navbar with Home, Work, Services, About, FAQ, Theme Toggle & Let's Talk */}
-      <Navbar 
-        currentRoute={currentRoute}
-        setCurrentRoute={handleNavigate}
-        onOpenContact={handleOpenContact}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-        isIntroRunning={showIntro}
-      />
+          {/* Emergency Site Announcement Banner */}
+          {systemStatus.announcement_active && systemStatus.announcement_text && (
+            <div style={{
+              backgroundColor: '#FF2424',
+              color: '#FFFFFF',
+              padding: '0.65rem 1rem',
+              fontSize: '0.8rem',
+              fontWeight: 800,
+              letterSpacing: '0.04em',
+              textAlign: 'center',
+              textTransform: 'uppercase',
+              position: 'relative',
+              zIndex: 100
+            }}>
+              🚨 NOTICE: {systemStatus.announcement_text}
+            </div>
+          )}
+
+          {/* Sticky Minimal Navbar */}
+          <Navbar 
+            currentRoute={currentRoute}
+            setCurrentRoute={handleNavigate}
+            onOpenContact={handleOpenContact}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            isIntroRunning={showIntro}
+          />
 
       {/* Main Content Router - 100% Full-Screen Dedicated Pages */}
       <main className="min-h-screen">
@@ -339,6 +395,8 @@ export default function App() {
         isOpen={isContactSidebarOpen} 
         onClose={handleCloseContact} 
       />
+      </>
+      )}
 
     </div>
   );
