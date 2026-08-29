@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, ArrowDown } from 'lucide-react';
-import HeroShowcaseSlider from '../components/HeroShowcaseSlider';
+import HeroQuantumEngine from '../components/HeroQuantumEngine';
 import MagneticButton from '../components/MagneticButton';
 import HeroGridBackground from '../components/HeroGridBackground';
 
@@ -168,15 +168,15 @@ export default function Hero({ onStartProject, onExploreWork }) {
             </motion.div>
           </div>
 
-          {/* Right: Unique Interactive Showcase Slider */}
-          <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+          {/* Right: Interactive 3D Quantum Hologram Engine */}
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
             <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
+              initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.25, duration: 0.6 }}
-              style={{ width: '100%', maxWidth: '480px' }}
+              transition={{ delay: 0.25, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+              style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
             >
-              <HeroShowcaseSlider onStartProject={onStartProject} />
+              <HeroQuantumEngine onStartProject={onStartProject} />
             </motion.div>
           </div>
 
