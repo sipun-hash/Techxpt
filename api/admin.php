@@ -1,6 +1,7 @@
 <?php
 // api/admin.php
 // Enterprise-Grade Admin Dashboard & Emergency Command Center - TECHXPT
+// Firebase Google Authentication + Fallback Master Authentication
 // 100% Mobile & Desktop Responsive
 // Strict 3-Color Palette: Premium Red (#FF2424), Premium Black (#0A0A0A), Premium White (#FFFFFF)
 // Zero Border-Radius (0px Sharp Architectural Styling)
@@ -54,6 +55,11 @@ require_once 'db.php';
 $ADMIN_USER = getenv('ADMIN_USER') ?: 'admin';
 $ADMIN_PASS = getenv('ADMIN_PASS') ?: 'TechXpt@2026Secure';
 
+// Firebase Config
+$FIREBASE_API_KEY = getenv('FIREBASE_API_KEY') ?: 'AIzaSyBp_Z9sF3-HJX0bYHKa3TLu6FFp4I8aK6g';
+$FIREBASE_PROJECT_ID = getenv('FIREBASE_PROJECT_ID') ?: 'techxpt';
+$ADMIN_GOOGLE_EMAILS = getenv('ADMIN_GOOGLE_EMAILS') ?: ''; // Optional comma-separated whitelist
+
 $sys = getSystemSettings($conn);
 
 // Rate Limiting
@@ -63,6 +69,82 @@ if (!isset($_SESSION['login_attempts'])) {
 }
 $is_locked_out = (time() < $_SESSION['lockout_time']);
 
+// -------------------------------------------------------------
+// 4. Firebase Token Verification Endpoint (Async POST)
+// -------------------------------------------------------------
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['action'] === 'firebase_auth') {
+    header('Content-Type: application/json; charset=UTF-8');
+    $rawInput = file_get_contents('php://input');
+    $payload = json_decode($rawInput, true);
+
+    if (empty($payload['idToken'])) {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "Missing Firebase ID Token."]);
+        exit;
+    }
+
+    $idToken = trim($payload['idToken']);
+    $verifyUrl = "https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" . $FIREBASE_API_KEY;
+
+    $opts = [
+        'http' => [
+            'header'  => "Content-Type: application/json\r\n",
+            'method'  => 'POST',
+            'content' => json_encode(['idToken' => $idToken]),
+            'timeout' => 10
+        ]
+    ];
+    $context = stream_context_create($opts);
+    $result = @file_get_contents($verifyUrl, false, $context);
+
+    if (!$result) {
+        http_response_code(401);
+        echo json_encode(["status" => "error", "message" => "Firebase authentication verification failed."]);
+        exit;
+    }
+
+    $resData = json_decode($result, true);
+    if (empty($resData['users'][0]['email'])) {
+        http_response_code(401);
+        echo json_encode(["status" => "error", "message" => "Invalid Firebase user token."]);
+        exit;
+    }
+
+    $authenticatedEmail = strtolower($resData['users'][0]['email']);
+    $emailVerified = !empty($resData['users'][0]['emailVerified']);
+
+    if (!$emailVerified) {
+        http_response_code(403);
+        echo json_encode(["status" => "error", "message" => "Google account email is not verified."]);
+        exit;
+    }
+
+    // Check Whitelist if set
+    if (!empty($ADMIN_GOOGLE_EMAILS)) {
+        $allowedList = array_map('trim', explode(',', strtolower($ADMIN_GOOGLE_EMAILS)));
+        if (!in_array($authenticatedEmail, $allowedList)) {
+            http_response_code(403);
+            echo json_encode(["status" => "error", "message" => "Access Denied: $authenticatedEmail is not on the authorized admin list."]);
+            exit;
+        }
+    }
+
+    // Success - Grant Admin Access
+    session_regenerate_id(true);
+    $_SESSION['authenticated'] = true;
+    $_SESSION['admin_user'] = $authenticatedEmail;
+    $_SESSION['auth_method'] = 'firebase_google';
+    $_SESSION['login_attempts'] = 0;
+    $_SESSION['lockout_time'] = 0;
+
+    echo json_encode([
+        "status" => "success",
+        "user" => $authenticatedEmail,
+        "redirect" => "admin.php"
+    ]);
+    exit;
+}
+
 // Logout Handler
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     session_unset();
@@ -71,7 +153,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     exit;
 }
 
-// Login Handler
+// Classic Master Password Handler (Fallback)
 $login_error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'login') {
     if ($is_locked_out) {
@@ -88,6 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 session_regenerate_id(true);
                 $_SESSION['authenticated'] = true;
                 $_SESSION['admin_user'] = $input_user;
+                $_SESSION['auth_method'] = 'master_password';
                 $_SESSION['login_attempts'] = 0;
                 $_SESSION['lockout_time'] = 0;
                 header("Location: admin.php");
@@ -109,7 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 $is_logged_in = !empty($_SESSION['authenticated']) && $_SESSION['authenticated'] === true;
 
 // -------------------------------------------------------------
-// 4. Authenticated Actions (Export, Delete, Emergency Controls)
+// 5. Authenticated Actions (Export, Delete, Emergency Controls)
 // -------------------------------------------------------------
 $notification = '';
 if ($is_logged_in) {
@@ -246,11 +329,15 @@ $active_tab = $_GET['tab'] ?? 'contacts';
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+    <!-- Firebase App & Auth SDK (Compat for seamless cross-browser support) -->
+    <?php if (!$is_logged_in): ?>
+        <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <?php endif; ?>
+
     <style>
-        /* -------------------------------------------------------------
-           STRICT 3-COLOR PALETTE: RED (#FF2424), BLACK (#0A0A0A), WHITE (#FFFFFF)
-           ZERO BORDER-RADIUS THROUGHOUT
-           ------------------------------------------------------------- */
+        /* STRICT 3-COLOR PALETTE: RED (#FF2424), BLACK (#0A0A0A), WHITE (#FFFFFF) */
         :root {
             --red: #FF2424;
             --red-hover: #D81818;
@@ -301,7 +388,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
         }
 
         /* -------------------------------------------------------------
-           LOGIN SCREEN (CLEAN & SHARP)
+           LOGIN SCREEN WITH FIREBASE GOOGLE AUTH
            ------------------------------------------------------------- */
         .login-wrap {
             display: flex;
@@ -315,8 +402,8 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             background: var(--surface);
             border: 1px solid var(--border);
             width: 100%;
-            max-width: 380px;
-            padding: 2rem 1.75rem;
+            max-width: 400px;
+            padding: 2.25rem 1.85rem;
             box-shadow: var(--card-shadow);
             position: relative;
         }
@@ -338,17 +425,63 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             text-align: center;
             font-size: 0.82rem;
             color: var(--text-secondary);
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.75rem;
             margin-top: 0.25rem;
         }
 
-        /* -------------------------------------------------------------
-           FORM INPUTS & BUTTONS
-           ------------------------------------------------------------- */
-        .form-group { margin-bottom: 1.25rem; }
+        /* Google Firebase Button */
+        .btn-google {
+            width: 100%;
+            padding: 0.85rem 1rem;
+            background: var(--bg);
+            border: 1px solid var(--border-light);
+            color: var(--text-primary);
+            font-weight: 800;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.2s;
+            margin-bottom: 1.5rem;
+        }
+        .btn-google:hover {
+            border-color: var(--red);
+            background: var(--surface-hover);
+        }
+        .btn-google:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .auth-divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+        .auth-divider::before, .auth-divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid var(--border);
+        }
+        .auth-divider span {
+            padding: 0 0.75rem;
+        }
+
+        /* Form Inputs */
+        .form-group { margin-bottom: 1.15rem; }
         label {
             display: block;
-            font-size: 0.76rem;
+            font-size: 0.74rem;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.06em;
@@ -424,7 +557,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
         }
 
         /* -------------------------------------------------------------
-           CLEAN FLUID TOPBAR (ZERO CRAMMING ON MOBILE)
+           TOPBAR & RESPONSIVE LAYOUT
            ------------------------------------------------------------- */
         .topbar {
             background: var(--surface);
@@ -591,9 +724,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             border-color: var(--red);
         }
 
-        /* -------------------------------------------------------------
-           CONTAINER & STATS CARDS
-           ------------------------------------------------------------- */
+        /* Container & Cards */
         .main-container {
             max-width: 1350px;
             width: 100%;
@@ -642,9 +773,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             text-transform: uppercase;
         }
 
-        /* -------------------------------------------------------------
-           NAV TABS & SEARCH
-           ------------------------------------------------------------- */
+        /* Tabs & Controls */
         .tabs-bar {
             display: flex;
             align-items: center;
@@ -688,9 +817,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             min-width: 180px;
         }
 
-        /* -------------------------------------------------------------
-           DESKTOP TABLE & MOBILE CARD ADAPTATION
-           ------------------------------------------------------------- */
+        /* Tables & Lists */
         .desktop-table-wrap {
             display: block;
             background: var(--surface);
@@ -755,7 +882,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             white-space: nowrap;
         }
 
-        /* Mobile Card View (shown only on mobile screens) */
+        /* Mobile Card List */
         .mobile-card-list {
             display: none;
             flex-direction: column;
@@ -796,9 +923,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             padding-top: 0.75rem;
         }
 
-        /* -------------------------------------------------------------
-           EMERGENCY GRID
-           ------------------------------------------------------------- */
+        /* Emergency Grid */
         .emergency-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -853,7 +978,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             color: var(--text-secondary);
         }
 
-        /* Toggle Checkbox */
         .custom-toggle {
             position: relative;
             display: inline-block;
@@ -883,9 +1007,7 @@ $active_tab = $_GET['tab'] ?? 'contacts';
         input:checked + .toggle-slider { background-color: var(--red); border-color: var(--red); }
         input:checked + .toggle-slider:before { transform: translateX(22px); }
 
-        /* -------------------------------------------------------------
-           MODAL POPUP (ZERO BORDER-RADIUS)
-           ------------------------------------------------------------- */
+        /* Modal */
         .modal-bg {
             position: fixed;
             inset: 0;
@@ -961,9 +1083,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             text-transform: uppercase;
         }
 
-        /* -------------------------------------------------------------
-           RESPONSIVE MOBILE BREAKPOINTS (< 800px)
-           ------------------------------------------------------------- */
         @media (max-width: 800px) {
             .desktop-only { display: none !important; }
             .desktop-tabs { display: none; }
@@ -978,27 +1097,46 @@ $active_tab = $_GET['tab'] ?? 'contacts';
 <body>
 
 <?php if (!$is_logged_in): ?>
-    <!-- 🔒 LOGIN SCREEN -->
+    <!-- 🔒 LOGIN SCREEN WITH FIREBASE AUTH -->
     <div class="login-wrap">
         <div class="login-card">
             <div class="brand-title">TECH<span>XPT</span></div>
-            <div class="brand-sub">Admin Portal Login</div>
+            <div class="brand-sub">Enterprise Admin Portal</div>
+
+            <!-- Firebase Error Alert Box -->
+            <div id="firebaseErrorBox" class="alert-box" style="display: none;"></div>
 
             <?php if (!empty($login_error)): ?>
                 <div class="alert-box"><?= safe($login_error) ?></div>
             <?php endif; ?>
 
+            <!-- 1. Google Firebase One-Click Sign In -->
+            <button id="googleSignInBtn" onclick="signInWithGoogleFirebase()" class="btn-google">
+                <svg width="18" height="18" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                </svg>
+                <span>Sign in with Google</span>
+            </button>
+
+            <div class="auth-divider">
+                <span>OR MASTER CREDENTIALS</span>
+            </div>
+
+            <!-- 2. Classic Master Credentials Form -->
             <form method="POST" action="admin.php">
                 <input type="hidden" name="action" value="login">
                 <input type="hidden" name="csrf_token" value="<?= safe($_SESSION['csrf_token'] ?? '') ?>">
 
                 <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" name="username" placeholder="Username" required autofocus autocomplete="username">
+                    <label>Master Username</label>
+                    <input type="text" name="username" placeholder="Username" required autocomplete="username">
                 </div>
 
                 <div class="form-group">
-                    <label>Password</label>
+                    <label>Master Password</label>
                     <input type="password" name="password" placeholder="Password" required autocomplete="current-password">
                 </div>
 
@@ -1007,8 +1145,72 @@ $active_tab = $_GET['tab'] ?? 'contacts';
         </div>
     </div>
 
+    <!-- Firebase Client Script -->
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBp_Z9sF3-HJX0bYHKa3TLu6FFp4I8aK6g",
+            authDomain: "techxpt.firebaseapp.com",
+            projectId: "techxpt",
+            storageBucket: "techxpt.firebasestorage.app",
+            messagingSenderId: "863472014543",
+            appId: "1:863472014543:web:995d7ecfe48c65b34e53ba"
+        };
+
+        if (typeof firebase !== 'undefined') {
+            firebase.initializeApp(firebaseConfig);
+        }
+
+        async function signInWithGoogleFirebase() {
+            const btn = document.getElementById('googleSignInBtn');
+            const errBox = document.getElementById('firebaseErrorBox');
+            if (errBox) errBox.style.display = 'none';
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span>Verifying Google Account...</span>';
+            }
+
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                const result = await firebase.auth().signInWithPopup(provider);
+                const idToken = await result.user.getIdToken();
+
+                const response = await fetch('admin.php?action=firebase_auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ idToken: idToken })
+                });
+
+                const resData = await response.json();
+                if (resData.status === 'success') {
+                    window.location.href = resData.redirect || 'admin.php';
+                } else {
+                    throw new Error(resData.message || 'Authentication rejected.');
+                }
+            } catch (err) {
+                console.error(err);
+                if (errBox) {
+                    errBox.innerText = err.message || 'Google Sign-In failed. Please try again.';
+                    errBox.style.display = 'block';
+                }
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `
+                        <svg width="18" height="18" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                        </svg>
+                        <span>Sign in with Google</span>
+                    `;
+                }
+            }
+        }
+    </script>
+
 <?php else: ?>
-    <!-- 📊 TOP NAVBAR -->
+    <!-- 📊 ADMIN DASHBOARD -->
     <header class="topbar">
         <div class="topbar-left">
             <a href="admin.php" class="logo">TECH<span>XPT</span></a>
@@ -1016,6 +1218,11 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                 <span class="status-pill" style="background: var(--red); color: #FFF;">⚠️ Maintenance Active</span>
             <?php else: ?>
                 <span class="status-pill desktop-only">Aiven Connected</span>
+            <?php endif; ?>
+            <?php if (!empty($_SESSION['admin_user'])): ?>
+                <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;" class="desktop-only">
+                    // <?= safe($_SESSION['admin_user']) ?>
+                </span>
             <?php endif; ?>
         </div>
 
@@ -1046,6 +1253,12 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             <div class="drawer-title">TECH<span>XPT</span> // MENU</div>
             <button class="drawer-close" onclick="closeMobileDrawer()" aria-label="Close Menu">&times;</button>
         </div>
+
+        <?php if (!empty($_SESSION['admin_user'])): ?>
+            <div style="font-size: 0.76rem; color: var(--text-muted); font-weight: 700; margin-bottom: 0.85rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); word-break: break-all;">
+                LOGGED IN AS:<br><span style="color: var(--text-primary); font-weight: 800;"><?= safe($_SESSION['admin_user']) ?></span>
+            </div>
+        <?php endif; ?>
 
         <div class="drawer-links">
             <a href="admin.php?tab=contacts" class="mobile-nav-link <?= $active_tab === 'contacts' ? 'active' : '' ?>">
@@ -1108,9 +1321,8 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             </div>
         </div>
 
-        <!-- Desktop Navigation Tabs & Search Controls -->
+        <!-- Navigation Tabs & Search Controls -->
         <div class="tabs-bar">
-            <!-- Desktop Tabs -->
             <div class="desktop-tabs">
                 <a href="admin.php?tab=contacts" class="tab-btn <?= $active_tab === 'contacts' ? 'active' : '' ?>">
                     Contact Leads (<?= count($contacts) ?>)
@@ -1123,7 +1335,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
                 </a>
             </div>
 
-            <!-- Search & Export -->
             <?php if ($active_tab !== 'emergency'): ?>
                 <div class="controls-row">
                     <div class="search-wrap">
@@ -1638,7 +1849,6 @@ $active_tab = $_GET['tab'] ?? 'contacts';
             }
         }
 
-        // Close on ESC key
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closeMobileDrawer();
