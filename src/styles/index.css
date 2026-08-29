@@ -165,6 +165,7 @@ html {
   background-color: var(--bg);
   color: var(--text-primary);
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

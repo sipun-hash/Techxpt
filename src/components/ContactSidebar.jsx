@@ -98,28 +98,28 @@ export default function ContactSidebar({ isOpen, onClose }) {
       {isOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', justifyContent: 'flex-end' }}>
           
-          {/* Backdrop Blur Overlay */}
+          {/* Backdrop Overlay */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
             onClick={onClose}
             style={{
               position: 'absolute',
               inset: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.7)',
-              backdropFilter: 'blur(5px)',
-              cursor: 'pointer'
+              backgroundColor: 'rgba(0, 0, 0, 0.75)',
+              cursor: 'pointer',
+              willChange: 'opacity'
             }}
           />
 
-          {/* Slide-over Sidebar Drawer (Low Vertical Footprint & Responsive) */}
+          {/* Slide-over Sidebar Drawer (Optimized Hardware Accelerated) */}
           <motion.div
             initial={{ x: '100%' }}
-            animate={{ x: 0 }}
+            animate={{ x: '0%' }}
             exit={{ x: '100%' }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
             style={{
               position: 'relative',
               zIndex: 10,
@@ -130,9 +130,11 @@ export default function ContactSidebar({ isOpen, onClose }) {
               borderLeft: '1px solid var(--border)',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '-10px 0 40px rgba(0, 0, 0, 0.4)',
+              boxShadow: '-15px 0 45px rgba(0, 0, 0, 0.5)',
               overflowY: 'auto',
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
+              willChange: 'transform',
+              transform: 'translateZ(0)'
             }}
           >
             {/* Top Header Bar */}

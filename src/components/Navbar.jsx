@@ -245,48 +245,86 @@ export default function Navbar({ currentRoute, setCurrentRoute, onOpenContact, t
       </div>
     </header>
 
-      {/* Mobile Drawer Menu */}
+      {/* Fullscreen Mobile Drawer Menu (Over Alert / Notice & Header) */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             style={{
               position: 'fixed',
-              top: 'var(--nav-height)',
-              left: 0,
-              right: 0,
-              bottom: 0,
+              inset: 0,
               backgroundColor: 'var(--bg)',
-              zIndex: 999,
-              borderTop: '1px solid var(--border)',
+              zIndex: 3000,
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              padding: '2rem 1.5rem',
-              overflowY: 'auto'
+              padding: '1.25rem 1.5rem 2rem 1.5rem',
+              overflowY: 'auto',
+              boxSizing: 'border-box'
             }}
           >
+            {/* Drawer Top Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingBottom: '1rem',
+              borderBottom: '1px solid var(--border)',
+              marginBottom: '1.5rem'
+            }}>
+              <Logo size="small" showTagline={false} />
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  onClick={(e) => onToggleTheme(e)}
+                  className="mobile-theme-btn"
+                  aria-label="Toggle Theme"
+                  style={{ width: '36px', height: '36px' }}
+                >
+                  {theme === 'dark' ? <Sun size={18} color="#FF2424" /> : <Moon size={18} color="#FF2424" />}
+                </button>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-label="Close Navigation Menu"
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <X size={20} color="#FF2424" />
+                </button>
+              </div>
+            </div>
+
+            {/* Navigation Links List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {navItems.map((item, index) => (
                 <motion.button
                   key={item.route}
-                  initial={{ opacity: 0, x: -15 }}
+                  initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.06 + 0.05, duration: 0.3 }}
+                  transition={{ delay: index * 0.05 + 0.1, duration: 0.25 }}
                   onClick={() => handleNavClick(item.route)}
                   style={{
                     fontFamily: 'var(--font-display)',
-                    fontSize: '1.65rem',
+                    fontSize: '1.5rem',
                     fontWeight: 900,
                     color: currentRoute === item.route ? 'var(--accent)' : 'var(--text-primary)',
                     textAlign: 'left',
                     textTransform: 'uppercase',
                     borderBottom: '1px solid var(--border)',
-                    paddingBottom: '0.85rem',
-                    paddingTop: '0.35rem',
+                    paddingBottom: '0.75rem',
+                    paddingTop: '0.25rem',
                     background: 'none',
                     borderTop: 'none',
                     borderLeft: 'none',
@@ -305,11 +343,12 @@ export default function Navbar({ currentRoute, setCurrentRoute, onOpenContact, t
               ))}
             </div>
 
+            {/* Bottom Actions */}
             <motion.div 
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 0.35 }}
-              style={{ paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}
+              transition={{ delay: 0.35, duration: 0.35 }}
+              style={{ paddingTop: '1.5rem', borderTop: '1px solid var(--border)', marginTop: '2rem' }}
             >
               <button
                 onClick={() => {
